@@ -1,0 +1,53 @@
+{
+  "recorded": "2000-01-01T00:00:00Z",
+  "target": "krm-rest-runtime fake API (built from types.yaml; not the vendor's API)",
+  "interactions": [
+    {
+      "method": "POST",
+      "path": "/api/v2/statements?nullable=true",
+      "body": "{\"statement\":\"DESCRIBE USER \\\"EXAMPLE_USER\\\"\",\"timeout\":60,\"parameters\":{\"multi_statement_count\":1}}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"code\":\"090001\",\"data\":[],\"message\":\"Statement executed successfully.\",\"resultSetMetaData\":{\"format\":\"jsonv2\",\"numRows\":0,\"partitionInfo\":[{\"rowCount\":0}],\"rowType\":[{\"name\":\"property\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"property_type\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"value\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"property_default\",\"nullable\":true,\"type\":\"text\"}]},\"sqlState\":\"00000\",\"statementHandle\":\"01c0ffee-0000-4000-8000-000000000083\",\"statementStatusUrl\":\"/api/v2/statements/01c0ffee-0000-4000-8000-000000000083\"}\n"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v2/statements?nullable=true",
+      "body": "{\"statement\":\"ALTER USER \\\"EXAMPLE_USER\\\" SET RSA_PUBLIC_KEY = 'MIIBIjANBgkqh'\",\"timeout\":60,\"parameters\":{\"multi_statement_count\":1}}",
+      "status": 202,
+      "contentType": "application/json",
+      "response": "{\"code\":\"333334\",\"message\":\"Asynchronous execution in progress. Use provided query id to perform query monitoring and management.\",\"statementHandle\":\"01c0ffee-0000-4000-8000-000000000084\",\"statementStatusUrl\":\"/api/v2/statements/01c0ffee-0000-4000-8000-000000000084\"}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v2/statements/01c0ffee-0000-4000-8000-000000000084",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"code\":\"090001\",\"data\":[[\"Statement executed successfully.\"]],\"message\":\"Statement executed successfully.\",\"resultSetMetaData\":{\"format\":\"jsonv2\",\"numRows\":1,\"partitionInfo\":[{\"rowCount\":1}],\"rowType\":[{\"name\":\"status\",\"nullable\":true,\"type\":\"text\"}]},\"sqlState\":\"00000\",\"statementHandle\":\"01c0ffee-0000-4000-8000-000000000084\",\"statementStatusUrl\":\"/api/v2/statements/01c0ffee-0000-4000-8000-000000000084\"}\n"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v2/statements?nullable=true",
+      "body": "{\"statement\":\"DESCRIBE USER \\\"EXAMPLE_USER\\\"\",\"timeout\":60,\"parameters\":{\"multi_statement_count\":1}}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"code\":\"090001\",\"data\":[[\"RSA_PUBLIC_KEY_FP\",\"String\",\"example-rsa-public-key-fp-7\",\"\"]],\"message\":\"Statement executed successfully.\",\"resultSetMetaData\":{\"format\":\"jsonv2\",\"numRows\":1,\"partitionInfo\":[{\"rowCount\":1}],\"rowType\":[{\"name\":\"property\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"property_type\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"value\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"property_default\",\"nullable\":true,\"type\":\"text\"}]},\"sqlState\":\"00000\",\"statementHandle\":\"01c0ffee-0000-4000-8000-000000000085\",\"statementStatusUrl\":\"/api/v2/statements/01c0ffee-0000-4000-8000-000000000085\"}\n"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v2/statements?nullable=true",
+      "body": "{\"statement\":\"ALTER USER \\\"EXAMPLE_USER\\\" UNSET RSA_PUBLIC_KEY\",\"timeout\":60,\"parameters\":{\"multi_statement_count\":1}}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"code\":\"090001\",\"data\":[[\"Statement executed successfully.\"]],\"message\":\"Statement executed successfully.\",\"resultSetMetaData\":{\"format\":\"jsonv2\",\"numRows\":1,\"partitionInfo\":[{\"rowCount\":1}],\"rowType\":[{\"name\":\"status\",\"nullable\":true,\"type\":\"text\"}]},\"sqlState\":\"00000\",\"statementHandle\":\"01c0ffee-0000-4000-8000-000000000086\",\"statementStatusUrl\":\"/api/v2/statements/01c0ffee-0000-4000-8000-000000000086\"}\n"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v2/statements?nullable=true",
+      "body": "{\"statement\":\"DESCRIBE USER \\\"EXAMPLE_USER\\\"\",\"timeout\":60,\"parameters\":{\"multi_statement_count\":1}}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"code\":\"090001\",\"data\":[],\"message\":\"Statement executed successfully.\",\"resultSetMetaData\":{\"format\":\"jsonv2\",\"numRows\":0,\"partitionInfo\":[{\"rowCount\":0}],\"rowType\":[{\"name\":\"property\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"property_type\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"value\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"property_default\",\"nullable\":true,\"type\":\"text\"}]},\"sqlState\":\"00000\",\"statementHandle\":\"01c0ffee-0000-4000-8000-000000000087\",\"statementStatusUrl\":\"/api/v2/statements/01c0ffee-0000-4000-8000-000000000087\"}\n"
+    }
+  ]
+}

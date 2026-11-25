@@ -1,0 +1,53 @@
+{
+  "recorded": "2000-01-01T00:00:00Z",
+  "target": "krm-rest-runtime fake API (built from types.yaml; not the vendor's API)",
+  "interactions": [
+    {
+      "method": "POST",
+      "path": "/api/v2/statements?nullable=true",
+      "body": "{\"statement\":\"SHOW PARAMETERS LIKE 'NETWORK_POLICY' IN USER \\\"EXAMPLE_USER\\\"\",\"timeout\":60,\"parameters\":{\"multi_statement_count\":1}}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"code\":\"090001\",\"data\":[],\"message\":\"Statement executed successfully.\",\"resultSetMetaData\":{\"format\":\"jsonv2\",\"numRows\":0,\"partitionInfo\":[{\"rowCount\":0}],\"rowType\":[{\"name\":\"key\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"level\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"value\",\"nullable\":true,\"type\":\"text\"}]},\"sqlState\":\"00000\",\"statementHandle\":\"01c0ffee-0000-4000-8000-000000000045\",\"statementStatusUrl\":\"/api/v2/statements/01c0ffee-0000-4000-8000-000000000045\"}\n"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v2/statements?nullable=true",
+      "body": "{\"statement\":\"ALTER USER \\\"EXAMPLE_USER\\\" SET NETWORK_POLICY = \\\"EXAMPLE_POLICY\\\"\",\"timeout\":60,\"parameters\":{\"multi_statement_count\":1}}",
+      "status": 202,
+      "contentType": "application/json",
+      "response": "{\"code\":\"333334\",\"message\":\"Asynchronous execution in progress. Use provided query id to perform query monitoring and management.\",\"statementHandle\":\"01c0ffee-0000-4000-8000-000000000046\",\"statementStatusUrl\":\"/api/v2/statements/01c0ffee-0000-4000-8000-000000000046\"}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v2/statements/01c0ffee-0000-4000-8000-000000000046",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"code\":\"090001\",\"data\":[[\"Statement executed successfully.\"]],\"message\":\"Statement executed successfully.\",\"resultSetMetaData\":{\"format\":\"jsonv2\",\"numRows\":1,\"partitionInfo\":[{\"rowCount\":1}],\"rowType\":[{\"name\":\"status\",\"nullable\":true,\"type\":\"text\"}]},\"sqlState\":\"00000\",\"statementHandle\":\"01c0ffee-0000-4000-8000-000000000046\",\"statementStatusUrl\":\"/api/v2/statements/01c0ffee-0000-4000-8000-000000000046\"}\n"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v2/statements?nullable=true",
+      "body": "{\"statement\":\"SHOW PARAMETERS LIKE 'NETWORK_POLICY' IN USER \\\"EXAMPLE_USER\\\"\",\"timeout\":60,\"parameters\":{\"multi_statement_count\":1}}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"code\":\"090001\",\"data\":[[\"NETWORK_POLICY\",\"USER\",\"EXAMPLE_POLICY\"]],\"message\":\"Statement executed successfully.\",\"resultSetMetaData\":{\"format\":\"jsonv2\",\"numRows\":1,\"partitionInfo\":[{\"rowCount\":1}],\"rowType\":[{\"name\":\"key\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"level\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"value\",\"nullable\":true,\"type\":\"text\"}]},\"sqlState\":\"00000\",\"statementHandle\":\"01c0ffee-0000-4000-8000-000000000047\",\"statementStatusUrl\":\"/api/v2/statements/01c0ffee-0000-4000-8000-000000000047\"}\n"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v2/statements?nullable=true",
+      "body": "{\"statement\":\"ALTER USER \\\"EXAMPLE_USER\\\" UNSET NETWORK_POLICY\",\"timeout\":60,\"parameters\":{\"multi_statement_count\":1}}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"code\":\"090001\",\"data\":[[\"Statement executed successfully.\"]],\"message\":\"Statement executed successfully.\",\"resultSetMetaData\":{\"format\":\"jsonv2\",\"numRows\":1,\"partitionInfo\":[{\"rowCount\":1}],\"rowType\":[{\"name\":\"status\",\"nullable\":true,\"type\":\"text\"}]},\"sqlState\":\"00000\",\"statementHandle\":\"01c0ffee-0000-4000-8000-000000000048\",\"statementStatusUrl\":\"/api/v2/statements/01c0ffee-0000-4000-8000-000000000048\"}\n"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v2/statements?nullable=true",
+      "body": "{\"statement\":\"SHOW PARAMETERS LIKE 'NETWORK_POLICY' IN USER \\\"EXAMPLE_USER\\\"\",\"timeout\":60,\"parameters\":{\"multi_statement_count\":1}}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"code\":\"090001\",\"data\":[],\"message\":\"Statement executed successfully.\",\"resultSetMetaData\":{\"format\":\"jsonv2\",\"numRows\":0,\"partitionInfo\":[{\"rowCount\":0}],\"rowType\":[{\"name\":\"key\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"level\",\"nullable\":true,\"type\":\"text\"},{\"name\":\"value\",\"nullable\":true,\"type\":\"text\"}]},\"sqlState\":\"00000\",\"statementHandle\":\"01c0ffee-0000-4000-8000-000000000049\",\"statementStatusUrl\":\"/api/v2/statements/01c0ffee-0000-4000-8000-000000000049\"}\n"
+    }
+  ]
+}

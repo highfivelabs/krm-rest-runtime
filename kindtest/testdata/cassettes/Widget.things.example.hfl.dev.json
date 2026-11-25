@@ -1,0 +1,85 @@
+{
+  "recorded": "2026-11-20T23:16:50Z",
+  "target": "the fake API",
+  "interactions": [
+    {
+      "method": "POST",
+      "path": "/orgs/acme/widgets?activate=false",
+      "body": "{\"color\":\"blue\",\"name\":\"{{name}}\"}",
+      "status": 201,
+      "contentType": "application/json",
+      "response": "{\"color\":\"blue\",\"id\":270000001,\"name\":\"{{name}}\"}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/orgs/acme/widgets/270000001?full=true",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"color\":\"blue\",\"id\":270000001,\"name\":\"{{name}}\"}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/orgs/acme/widgets/270000001?full=true",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"color\":\"blue\",\"id\":270000001,\"name\":\"{{name}}\"}\n"
+    },
+    {
+      "method": "PATCH",
+      "path": "/orgs/acme/widgets/270000001",
+      "body": "{\"color\":\"green\",\"name\":\"{{name}}\"}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"color\":\"green\",\"id\":270000001,\"name\":\"{{name}}\"}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/orgs/acme/widgets/270000001?full=true",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"color\":\"green\",\"id\":270000001,\"name\":\"{{name}}\"}\n"
+    },
+    {
+      "method": "PATCH",
+      "path": "/orgs/acme/widgets/270000001",
+      "body": "{\"color\":\"hfl-live-drift\"}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"color\":\"hfl-live-drift\",\"id\":270000001,\"name\":\"{{name}}\"}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/orgs/acme/widgets/270000001?full=true",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"color\":\"hfl-live-drift\",\"id\":270000001,\"name\":\"{{name}}\"}\n"
+    },
+    {
+      "method": "PATCH",
+      "path": "/orgs/acme/widgets/270000001",
+      "body": "{\"color\":\"green\",\"name\":\"{{name}}\"}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"color\":\"green\",\"id\":270000001,\"name\":\"{{name}}\"}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/orgs/acme/widgets/270000001?full=true",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"color\":\"green\",\"id\":270000001,\"name\":\"{{name}}\"}\n"
+    },
+    {
+      "method": "DELETE",
+      "path": "/orgs/acme/widgets/270000001",
+      "status": 204
+    },
+    {
+      "method": "GET",
+      "path": "/orgs/acme/widgets/270000001?full=true",
+      "status": 404,
+      "contentType": "text/plain; charset=utf-8",
+      "response": "{\"message\":\"Not Found\"}\n"
+    }
+  ]
+}

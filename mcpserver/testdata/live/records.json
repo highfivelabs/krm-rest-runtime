@@ -1,0 +1,1 @@
+{"Widget.things.example.hfl.dev": {"result": "pass", "steps": ["create", "read", "update", "drift", "delete", "gone"], "run": "hfl-live-1", "date": "2026-11-17T01:33:37Z", "target": "Example sandbox org", "lastPass": "2026-11-17T01:33:37Z"}}

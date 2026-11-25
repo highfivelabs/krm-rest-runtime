@@ -1,0 +1,39 @@
+vendor: example
+connection: {group: core.example.hfl.dev, version: v1alpha1, kind: Connection}
+kinds:
+- kind: Widget
+  group: things.example.hfl.dev
+  version: v1alpha1
+  plural: widgets
+  shape: crud
+  create: {method: POST, path: "/orgs/{org}/widgets"}
+  read: {method: GET, path: "/orgs/{org}/widgets/{widget_id}"}
+  update: {method: PATCH, path: "/orgs/{org}/widgets/{widget_id}"}
+  delete: {method: DELETE, path: "/orgs/{org}/widgets/{widget_id}"}
+  params: [{name: org, field: org}]
+  id: {param: widget_id, from: id}
+  writeOnly: [token]
+  terraform: [example_widget]
+  sample: {org: acme, name: w1, color: blue}
+- kind: Settings
+  group: things.example.hfl.dev
+  version: v1alpha1
+  plural: settings
+  shape: settings
+  read: {method: GET, path: "/orgs/{org}/settings"}
+  update: {method: PATCH, path: "/orgs/{org}/settings"}
+  params: [{name: org, field: org}]
+  terraform: [example_org_settings]
+  sample: {org: acme, default_branch: main}
+- kind: Gadget
+  group: things.example.hfl.dev
+  version: v1alpha1
+  plural: gadgets
+  shape: crud
+  create: {method: POST, path: "/widgets/{widget_id}/gadgets"}
+  read: {method: GET, path: "/widgets/{widget_id}/gadgets/{gadget_id}"}
+  update: {method: PATCH, path: "/widgets/{widget_id}/gadgets/{gadget_id}"}
+  delete: {method: DELETE, path: "/widgets/{widget_id}/gadgets/{gadget_id}"}
+  params: [{name: widget_id, field: widgetID}]
+  id: {param: gadget_id, from: id}
+  sample: {widgetID: "1", name: g1}

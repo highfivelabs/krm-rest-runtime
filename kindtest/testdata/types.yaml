@@ -1,0 +1,269 @@
+vendor: example
+connection: {group: core.example.hfl.dev, version: v1alpha1, kind: Connection}
+kinds:
+- kind: Widget
+  group: things.example.hfl.dev
+  version: v1alpha1
+  plural: widgets
+  shape: crud
+  create: {method: POST, path: "/orgs/{org}/widgets", query: {activate: "false"}}  # the fake answers only with it
+  read: {method: GET, path: "/orgs/{org}/widgets/{widget_id}", query: {full: "true"}}  # the fake answers only with it
+  update: {method: PATCH, path: "/orgs/{org}/widgets/{widget_id}"}
+  delete: {method: DELETE, path: "/orgs/{org}/widgets/{widget_id}"}
+  params: [{name: org, field: org}]
+  id: {param: widget_id, from: id}
+  sample: {org: acme, name: w1, color: blue}
+- kind: Secret
+  group: things.example.hfl.dev
+  version: v1alpha1
+  plural: secrets
+  shape: upsert
+  read: {method: GET, path: "/orgs/{org}/secrets/{secret_name}"}
+  update: {method: PUT, path: "/orgs/{org}/secrets/{secret_name}"}
+  delete: {method: DELETE, path: "/orgs/{org}/secrets/{secret_name}"}
+  params: [{name: org, field: org}, {name: secret_name, field: secretName}]
+  writeOnly: [value]
+  sample: {org: acme, secretName: S1, value: hunter2, visibility: all}
+- kind: Settings
+  group: things.example.hfl.dev
+  version: v1alpha1
+  plural: settings
+  shape: settings
+  read: {method: GET, path: "/orgs/{org}/settings"}
+  update: {method: PATCH, path: "/orgs/{org}/settings"}
+  params: [{name: org, field: org}]
+  sample: {org: acme, default_branch: main}
+- kind: Record
+  group: things.example.hfl.dev
+  version: v1alpha1
+  plural: records
+  shape: crud
+  envelope: result
+  create: {method: POST, path: "/zones/{zone_id}/records"}
+  read: {method: GET, path: "/zones/{zone_id}/records/{record_id}"}
+  update: {method: PUT, path: "/zones/{zone_id}/records/{record_id}"}
+  delete: {method: DELETE, path: "/zones/{zone_id}/records/{record_id}"}
+  params: [{name: zone_id, field: zoneID}]
+  id: {param: record_id, from: id}
+  sample: {zoneID: z1, name: www, type: CNAME, content: example.com}
+# Must be stopped before it can be deleted (GitLab's environments): the fake
+# answers 403 to a DELETE until the stop call was made.
+- kind: Environment
+  group: things.example.hfl.dev
+  version: v1alpha1
+  plural: environments
+  shape: crud
+  create: {method: POST, path: "/projects/{id}/environments"}
+  read: {method: GET, path: "/projects/{id}/environments/{environment_id}"}
+  update: {method: PUT, path: "/projects/{id}/environments/{environment_id}"}
+  delete: {method: DELETE, path: "/projects/{id}/environments/{environment_id}"}
+  beforeDelete: [{method: POST, path: "/projects/{id}/environments/{environment_id}/stop"}]
+  params: [{name: id, field: projectID}]
+  id: {param: environment_id, from: id}
+  sample: {projectID: p1, name: review}
+# Takes scopes as a space-separated string and reads them back as an array
+# (GitLab's applications); the fake does the same.
+- kind: Application
+  group: things.example.hfl.dev
+  version: v1alpha1
+  plural: applications
+  shape: crud
+  create: {method: POST, path: "/applications"}
+  read: {method: GET, path: "/applications/{id}"}
+  update: {method: PUT, path: "/applications/{id}"}
+  delete: {method: DELETE, path: "/applications/{id}"}
+  id: {param: id, from: id}
+  writeOnly: [name]
+  compare: {scopes: splitSpace}
+  sample: {name: app1, scopes: "read_user api"}
+# Takes enforce_admins as a boolean and reads it back as {"enabled": ...}
+# (GitHub's branch protection); the fake does the same.
+- kind: BranchProtection
+  group: things.example.hfl.dev
+  version: v1alpha1
+  plural: branchprotections
+  shape: upsert
+  read: {method: GET, path: "/repos/{repo}/branches/{branch}/protection"}
+  update: {method: PUT, path: "/repos/{repo}/branches/{branch}/protection"}
+  delete: {method: DELETE, path: "/repos/{repo}/branches/{branch}/protection"}
+  params: [{name: repo, field: repo}, {name: branch, field: branch}]
+  compare: {enforce_admins: enabledObject}
+  sample: {repo: r1, branch: main, enforce_admins: true, note: n}
+# Made and deleted on admin paths, read and updated on its own (Grafana's
+# users); one setting is write-only inside an object (read back masked).
+- kind: Member
+  group: core.example.hfl.dev
+  version: v1alpha1
+  plural: members
+  shape: crud
+  create: {method: POST, path: /admin/members}
+  read: {method: GET, path: "/members/{member_id}"}
+  update: {method: PUT, path: "/members/{member_id}"}
+  delete: {method: DELETE, path: "/admin/members/{member_id}"}
+  id: {param: member_id, from: id}
+  writeOnly: [settings.secret]
+  sample: {login: m1, settings: {mode: a, secret: hunter2}}
+# Listed, not got (Snowflake roles): read finds it in the list.
+- kind: Role
+  group: core.example.hfl.dev
+  version: v1alpha1
+  plural: roles
+  shape: crud
+  create: {method: POST, path: /roles}
+  read: {method: GET, path: /roles, find: {list: data, field: name, param: name}}
+  delete: {method: DELETE, path: "/roles/{name}"}
+  id: {param: name, from: name}
+  caseInsensitive: [name]
+  sample: {name: analyst, comment: hello}
+# A grant: no identity; undone by sending the same body.
+- kind: Grant
+  group: core.example.hfl.dev
+  version: v1alpha1
+  plural: grants
+  shape: assoc
+  create: {method: POST, path: "/roles/{role}/grants"}
+  read: {method: GET, path: "/roles/{role}/grants"}
+  delete: {method: POST, path: "/roles/{role}/grants:revoke", sendBody: true}
+  params: [{name: role, field: role}]
+  sample: {role: analyst, privileges: [USAGE], securable_type: DATABASE, securable: {name: db1}}
+# No update, but re-created in place on opt-in (Snowflake's CREATE OR REPLACE).
+- kind: Script
+  group: core.example.hfl.dev
+  version: v1alpha1
+  plural: scripts
+  shape: crud
+  create: {method: POST, path: "/dbs/{db}/scripts"}
+  read: {method: GET, path: "/dbs/{db}/scripts/{name}"}
+  delete: {method: DELETE, path: "/dbs/{db}/scripts/{name}"}
+  replace: {method: POST, path: "/dbs/{db}/scripts", query: {createMode: orReplace}, identity: [name]}
+  params: [{name: db, field: db}]
+  id: {param: name, from: name}
+  caseInsensitive: [name]
+  sample: {db: d1, name: nightly, body: "select 1"}
+# The same, named by a server-assigned ID plus its name and arguments
+# (Snowflake's functions).
+- kind: Function
+  group: core.example.hfl.dev
+  version: v1alpha1
+  plural: functions
+  shape: crud
+  create: {method: POST, path: "/dbs/{db}/functions"}
+  read: {method: GET, path: "/dbs/{db}/functions/{fn}"}
+  delete: {method: DELETE, path: "/dbs/{db}/functions/{fn}"}
+  replace: {method: POST, path: "/dbs/{db}/functions", query: {createMode: orReplace}, identity: [name, arguments]}
+  params: [{name: db, field: db}]
+  id: {param: fn, from: id}
+  sample: {db: d1, name: add_one, arguments: [{name: x, datatype: INT}], body: "x + 1"}
+# Named by its signature, composed from the spec: Snowflake's user-defined
+# functions and procedures (NAME(TYPE, ...)); the create answers no ID.
+- kind: Signature
+  group: core.example.hfl.dev
+  version: v1alpha1
+  plural: signatures
+  shape: crud
+  create: {method: POST, path: "/dbs/{db}/udfs"}
+  read: {method: GET, path: "/dbs/{db}/udfs/{nameWithArgs}"}
+  delete: {method: DELETE, path: "/dbs/{db}/udfs/{nameWithArgs}"}
+  replace: {method: POST, path: "/dbs/{db}/udfs", query: {createMode: orReplace}, identity: [name, arguments]}
+  params: [{name: db, field: db}]
+  id: {param: nameWithArgs, from: "{name}({arguments[].datatype})"}
+  caseInsensitive: [name]
+  sample: {db: d1, name: add, arguments: [{name: x, datatype: NUMBER}, {name: y, datatype: NUMBER}], body: "x + y"}
+# Some fields are set at create only; the update refuses them (PagerDuty's
+# custom fields: name, data_type). The fake refuses them too.
+- kind: Field
+  group: core.example.hfl.dev
+  version: v1alpha1
+  plural: fields
+  shape: crud
+  create: {method: POST, path: /fields}
+  read: {method: GET, path: "/fields/{field_id}"}
+  update: {method: PUT, path: "/fields/{field_id}"}
+  delete: {method: DELETE, path: "/fields/{field_id}"}
+  id: {param: field_id, from: id}
+  createOnly: [data_type, name]
+  sample: {name: f1, data_type: string, display_name: F1}
+# Layers read back in reverse (PagerDuty's schedules); the fake does the same.
+- kind: Schedule
+  group: core.example.hfl.dev
+  version: v1alpha1
+  plural: schedules
+  shape: crud
+  create: {method: POST, path: /schedules}
+  read: {method: GET, path: "/schedules/{id}"}
+  update: {method: PUT, path: "/schedules/{id}"}
+  delete: {method: DELETE, path: "/schedules/{id}"}
+  id: {param: id, from: id}
+  compare: {layers: unordered}
+  sample: {name: s1, layers: [{name: a, start: "2026-12-16T00:00:00Z"}, {name: b, start: "2026-12-17T00:00:00Z"}]}
+# Read, updated in place and deleted only with a query parameter filled
+# from the spec: Confluent Cloud's ?environment={environment.id}. The fake
+# answers those calls only when it is sent.
+- kind: Cluster
+  group: core.example.hfl.dev
+  version: v1alpha1
+  plural: clusters
+  shape: crud
+  envelope: spec
+  bodyEnvelope: spec
+  create: {method: POST, path: "/clusters"}
+  read: {method: GET, path: "/clusters/{id}", query: {environment: "{environment.id}"}}
+  update: {method: PATCH, path: "/clusters/{id}"}
+  delete: {method: DELETE, path: "/clusters/{id}", query: {environment: "{environment.id}"}}
+  id: {param: id, from: id}
+  createOnly: [cloud]
+  sample: {display_name: c1, cloud: GCP, environment: {id: env-1}}
+- kind: ExportJob
+  group: things.example.hfl.dev
+  version: v1alpha1
+  plural: exportjobs
+  shape: crud
+  create: {method: POST, path: "/orgs/{org}/exports"}
+  read: {method: GET, path: "/orgs/{org}/exports/{export_id}"}
+  params: [{name: org, field: org}]
+  id: {param: export_id, from: id}
+  forget: the API cannot delete an export job
+  sample: {org: acme, bucket: b1}
+# Written on one path, read from another's list by a nested field
+# (PagerDuty's team members: PUT /teams/{id}/users/{user_id}, listed at
+# GET /teams/{id}/members as {"members": [{"user": {"id": ...}, "role": ...}]}).
+- kind: TeamMember
+  group: things.example.hfl.dev
+  version: v1alpha1
+  plural: teammembers
+  shape: upsert
+  read: {method: GET, path: "/teams/{team}/members", find: {list: members, field: user.id, param: user_id}}
+  update: {method: PUT, path: "/teams/{team}/users/{user_id}"}
+  delete: {method: DELETE, path: "/teams/{team}/users/{user_id}"}
+  params: [{name: team, field: team}, {name: user_id, field: user_id}]
+  sample: {team: t1, user_id: u1, role: observer}
+# Deleted by closing it (GitHub's issues): the delete is a PATCH with a
+# fixed body, and the issue stays readable.
+- kind: Issue
+  group: things.example.hfl.dev
+  version: v1alpha1
+  plural: issues
+  shape: crud
+  create: {method: POST, path: "/repos/{repo}/issues"}
+  read: {method: GET, path: "/repos/{repo}/issues/{number}"}
+  update: {method: PATCH, path: "/repos/{repo}/issues/{number}"}
+  delete: {method: PATCH, path: "/repos/{repo}/issues/{number}", body: {state: closed}}
+  stays: an issue cannot be deleted; it is closed
+  params: [{name: repo, field: repo}]
+  id: {param: number, from: number}
+  sample: {repo: r1, title: t1}
+# A link sent as a one-element array in an envelope, read from a wrapped list
+# (PagerDuty's business service subscribers: POST .../subscribers
+# {"subscribers": [{...}]}, undone by the same body to .../unsubscribe).
+- kind: Subscriber
+  group: things.example.hfl.dev
+  version: v1alpha1
+  plural: subscribers
+  shape: assoc
+  create: {method: POST, path: "/services/{svc}/subscribers"}
+  read: {method: GET, path: "/services/{svc}/subscribers", find: {list: subscribers}}
+  delete: {method: POST, path: "/services/{svc}/unsubscribe", sendBody: true}
+  params: [{name: svc, field: svc}]
+  bodyEnvelope: subscribers
+  bodyArray: true
+  sample: {svc: s1, subscriber_id: u1, subscriber_type: user}

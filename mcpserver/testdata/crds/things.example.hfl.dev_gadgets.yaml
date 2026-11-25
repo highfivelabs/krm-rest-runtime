@@ -1,0 +1,41 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: gadgets.things.example.hfl.dev
+spec:
+  group: things.example.hfl.dev
+  scope: Namespaced
+  names: {kind: Gadget, listKind: GadgetList, plural: gadgets, singular: gadget}
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    subresources: {status: {}}
+    schema:
+      openAPIV3Schema:
+        type: object
+        description: "Gadget: a part of a Widget."
+        properties:
+          apiVersion: {type: string}
+          kind: {type: string}
+          metadata: {type: object}
+          spec:
+            type: object
+            properties:
+              widgetID: {type: string, description: "Fills {widget_id} in /widgets/{widget_id}/gadgets/{gadget_id}."}
+              name: {type: string}
+              connectionRef: {type: object, properties: {name: {type: string}}}
+              fieldRefs:
+                type: object
+                maxProperties: 64
+                additionalProperties:
+                  type: object
+                  required: [kind, name]
+                  properties: {apiVersion: {type: string}, kind: {type: string}, name: {type: string}, fieldPath: {type: string}}
+            x-kubernetes-validations:
+            - rule: has(self.widgetID) || (has(self.fieldRefs) && 'widgetID' in self.fieldRefs)
+              message: spec.widgetID is required (or set it from spec.fieldRefs.widgetID)
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+        required: [spec]

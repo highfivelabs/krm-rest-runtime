@@ -1,0 +1,85 @@
+{
+  "recorded": "2026-11-20T23:16:51Z",
+  "target": "the fake API",
+  "interactions": [
+    {
+      "method": "POST",
+      "path": "/zones/z1/records",
+      "body": "{\"content\":\"example.com\",\"name\":\"{{name}}\",\"type\":\"CNAME\"}",
+      "status": 201,
+      "contentType": "application/json",
+      "response": "{\"result\":{\"content\":\"example.com\",\"id\":270000002,\"name\":\"{{name}}\",\"type\":\"CNAME\"}}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/zones/z1/records/270000002",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"result\":{\"content\":\"example.com\",\"id\":270000002,\"name\":\"{{name}}\",\"type\":\"CNAME\"}}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/zones/z1/records/270000002",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"result\":{\"content\":\"example.com\",\"id\":270000002,\"name\":\"{{name}}\",\"type\":\"CNAME\"}}\n"
+    },
+    {
+      "method": "PUT",
+      "path": "/zones/z1/records/270000002",
+      "body": "{\"content\":\"changed-content\",\"name\":\"{{name}}\",\"type\":\"CNAME\"}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"result\":{\"content\":\"changed-content\",\"id\":270000002,\"name\":\"{{name}}\",\"type\":\"CNAME\"}}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/zones/z1/records/270000002",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"result\":{\"content\":\"changed-content\",\"id\":270000002,\"name\":\"{{name}}\",\"type\":\"CNAME\"}}\n"
+    },
+    {
+      "method": "PUT",
+      "path": "/zones/z1/records/270000002",
+      "body": "{\"content\":\"hfl-live-drift\"}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"result\":{\"content\":\"hfl-live-drift\",\"id\":270000002,\"name\":\"{{name}}\",\"type\":\"CNAME\"}}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/zones/z1/records/270000002",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"result\":{\"content\":\"hfl-live-drift\",\"id\":270000002,\"name\":\"{{name}}\",\"type\":\"CNAME\"}}\n"
+    },
+    {
+      "method": "PUT",
+      "path": "/zones/z1/records/270000002",
+      "body": "{\"content\":\"changed-content\",\"name\":\"{{name}}\",\"type\":\"CNAME\"}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"result\":{\"content\":\"changed-content\",\"id\":270000002,\"name\":\"{{name}}\",\"type\":\"CNAME\"}}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/zones/z1/records/270000002",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"result\":{\"content\":\"changed-content\",\"id\":270000002,\"name\":\"{{name}}\",\"type\":\"CNAME\"}}\n"
+    },
+    {
+      "method": "DELETE",
+      "path": "/zones/z1/records/270000002",
+      "status": 204
+    },
+    {
+      "method": "GET",
+      "path": "/zones/z1/records/270000002",
+      "status": 404,
+      "contentType": "text/plain; charset=utf-8",
+      "response": "{\"message\":\"Not Found\"}\n"
+    }
+  ]
+}

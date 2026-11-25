@@ -1,0 +1,33 @@
+{
+  "recorded": "2026-11-20T23:16:51Z",
+  "target": "the fake API",
+  "interactions": [
+    {
+      "method": "POST",
+      "path": "/roles",
+      "body": "{\"comment\":\"hello\",\"name\":\"{{name_}}\"}",
+      "status": 201,
+      "contentType": "application/json",
+      "response": "{\"comment\":\"hello\",\"name\":\"{{name_}}\"}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/roles",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"data\":[{\"comment\":\"hello\",\"name\":\"{{name_}}\"}]}\n"
+    },
+    {
+      "method": "DELETE",
+      "path": "/roles/{{name_}}",
+      "status": 204
+    },
+    {
+      "method": "GET",
+      "path": "/roles",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"data\":[]}\n"
+    }
+  ]
+}

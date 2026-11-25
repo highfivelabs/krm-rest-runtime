@@ -1,0 +1,49 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: widgets.things.example.hfl.dev
+spec:
+  group: things.example.hfl.dev
+  scope: Namespaced
+  names: {kind: Widget, listKind: WidgetList, plural: widgets, singular: widget}
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    subresources: {status: {}}
+    schema:
+      openAPIV3Schema:
+        type: object
+        description: "Widget: a thing an organization makes. Terraform equivalent: example_widget."
+        properties:
+          apiVersion: {type: string}
+          kind: {type: string}
+          metadata: {type: object}
+          spec:
+            type: object
+            required: [org, name]
+            properties:
+              org: {type: string, description: "Fills {org} in /orgs/{org}/widgets/{widget_id}."}
+              name: {type: string, description: The widget's name.}
+              color: {type: string, description: Its color., enum: [blue, red]}
+              size:
+                type: object
+                description: How big it is.
+                required: [width]
+                properties:
+                  width: {type: integer, description: Width in mm.}
+                  height: {type: integer}
+              token: {type: string, description: A write-only token.}
+              connectionRef: {type: object, properties: {name: {type: string}}}
+              secretRefs:
+                type: object
+                additionalProperties:
+                  type: object
+                  required: [name, key]
+                  properties: {name: {type: string}, key: {type: string}}
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+            properties:
+              id: {type: string}
+        required: [spec]

@@ -1,0 +1,95 @@
+{
+  "recorded": "2026-11-20T23:16:51Z",
+  "target": "the fake API",
+  "interactions": [
+    {
+      "method": "GET",
+      "path": "/orgs/acme/settings",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/orgs/acme/settings",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{}\n"
+    },
+    {
+      "method": "PATCH",
+      "path": "/orgs/acme/settings",
+      "body": "{\"default_branch\":\"main\"}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"default_branch\":\"main\"}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/orgs/acme/settings",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"default_branch\":\"main\"}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/orgs/acme/settings",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"default_branch\":\"main\"}\n"
+    },
+    {
+      "method": "PATCH",
+      "path": "/orgs/acme/settings",
+      "body": "{\"default_branch\":\"trunk\"}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"default_branch\":\"trunk\"}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/orgs/acme/settings",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"default_branch\":\"trunk\"}\n"
+    },
+    {
+      "method": "PATCH",
+      "path": "/orgs/acme/settings",
+      "body": "{\"default_branch\":\"hfl-live-drift\"}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"default_branch\":\"hfl-live-drift\"}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/orgs/acme/settings",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"default_branch\":\"hfl-live-drift\"}\n"
+    },
+    {
+      "method": "PATCH",
+      "path": "/orgs/acme/settings",
+      "body": "{\"default_branch\":\"trunk\"}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"default_branch\":\"trunk\"}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/orgs/acme/settings",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"default_branch\":\"trunk\"}\n"
+    },
+    {
+      "method": "PATCH",
+      "path": "/orgs/acme/settings",
+      "body": "{}",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "{\"default_branch\":\"trunk\"}\n"
+    }
+  ]
+}

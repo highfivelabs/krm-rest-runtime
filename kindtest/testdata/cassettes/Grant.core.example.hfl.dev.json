@@ -1,0 +1,36 @@
+{
+  "recorded": "2026-11-20T23:16:51Z",
+  "target": "the fake API",
+  "interactions": [
+    {
+      "method": "GET",
+      "path": "/roles/analyst/grants",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "[]\n"
+    },
+    {
+      "method": "POST",
+      "path": "/roles/analyst/grants",
+      "body": "{\"privileges\":[\"USAGE\"],\"securable\":{\"name\":\"db1\"},\"securable_type\":\"DATABASE\"}",
+      "status": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "response": "{\"status\":\"ok\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/roles/analyst/grants",
+      "status": 200,
+      "contentType": "application/json",
+      "response": "[{\"privileges\":[\"USAGE\"],\"securable\":{\"name\":\"db1\"},\"securable_type\":\"DATABASE\"}]\n"
+    },
+    {
+      "method": "POST",
+      "path": "/roles/analyst/grants:revoke",
+      "body": "{\"privileges\":[\"USAGE\"],\"securable\":{\"name\":\"db1\"},\"securable_type\":\"DATABASE\"}",
+      "status": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "response": "{\"status\":\"ok\"}"
+    }
+  ]
+}

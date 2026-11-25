@@ -1,0 +1,301 @@
+# sql kinds (shape sql), their statements in Snowflake's SQL syntax.
+vendor: example
+connection: {group: core.example.dev, version: v1alpha1, kind: Connection}
+kinds:
+- kind: MaskingPolicy
+  group: masking.example.dev
+  version: v1alpha1
+  plural: maskingpolicies
+  shape: sql
+  read: {method: POST, path: /api/v2/statements}
+  terraform: [snowflake_masking_policy]
+  writeOnly: [exempt_other_policies, return_data_type, signature]
+  sql:
+    mode: object
+    id: [database, schema, name]
+    fields:
+      database: {type: identifier}
+      schema: {type: identifier}
+      name: {type: identifier}
+      signature: {type: args}
+      return_data_type: {type: datatype}
+      body: {type: expression}
+      comment: {type: string}
+      exempt_other_policies: {type: boolean}
+    create: CREATE MASKING POLICY {@id} AS ({signature}) RETURNS {return_data_type} -> {body}[ COMMENT = {comment}][ EXEMPT_OTHER_POLICIES = {exempt_other_policies}]
+    read:
+    - statement: SHOW MASKING POLICIES LIKE {@like} IN SCHEMA {@parent}
+      match: {name: "{name}", database_name: "{database}", schema_name: "{schema}"}
+      columns: {comment: comment}
+    - statement: DESCRIBE MASKING POLICY {@id}
+      columns: {body: body}
+    alter:
+      body: ALTER MASKING POLICY {@id} SET BODY -> {body}
+      comment: ALTER MASKING POLICY {@id} SET COMMENT = {comment}
+    unset:
+      comment: ALTER MASKING POLICY {@id} UNSET COMMENT
+    delete: DROP MASKING POLICY IF EXISTS {@id}
+  sample:
+    database: example-database
+    schema: example_schema
+    name: example_name
+    signature: [{name: val, type: VARCHAR}]
+    return_data_type: VARCHAR
+    body: "CASE WHEN current_role() IN ('ANALYST') THEN val ELSE '*****' END"
+    comment: example-comment
+- kind: SessionPolicy
+  group: session.example.dev
+  version: v1alpha1
+  plural: sessionpolicies
+  shape: sql
+  read: {method: POST, path: /api/v2/statements}
+  terraform: [snowflake_session_policy]
+  sql:
+    mode: object
+    id: [database, schema, name]
+    fields:
+      database: {type: identifier}
+      schema: {type: identifier}
+      name: {type: identifier}
+      session_idle_timeout_mins: {type: integer}
+      allowed_secondary_roles: {type: identifiers}
+      comment: {type: string}
+    create: CREATE SESSION POLICY {@id}[ SESSION_IDLE_TIMEOUT_MINS = {session_idle_timeout_mins}][ ALLOWED_SECONDARY_ROLES = ({allowed_secondary_roles})][ COMMENT = {comment}]
+    read:
+    - statement: SHOW SESSION POLICIES LIKE {@like} IN SCHEMA {@parent}
+      match: {name: "{name}", database_name: "{database}", schema_name: "{schema}"}
+      columns: {comment: comment}
+    - statement: DESCRIBE SESSION POLICY {@id}
+      properties: {name: property, value: value}
+      columns: {session_idle_timeout_mins: SESSION_IDLE_TIMEOUT_MINS, allowed_secondary_roles: ALLOWED_SECONDARY_ROLES}
+    alter:
+      session_idle_timeout_mins: ALTER SESSION POLICY {@id} SET SESSION_IDLE_TIMEOUT_MINS = {session_idle_timeout_mins}
+      allowed_secondary_roles: ALTER SESSION POLICY {@id} SET ALLOWED_SECONDARY_ROLES = ({allowed_secondary_roles})
+      comment: ALTER SESSION POLICY {@id} SET COMMENT = {comment}
+    unset:
+      session_idle_timeout_mins: ALTER SESSION POLICY {@id} UNSET SESSION_IDLE_TIMEOUT_MINS
+      comment: ALTER SESSION POLICY {@id} UNSET COMMENT
+    delete: DROP SESSION POLICY IF EXISTS {@id}
+  sample:
+    database: DB
+    schema: SC
+    name: '"Mixed Case"'
+    session_idle_timeout_mins: 30
+    allowed_secondary_roles: [analyst, '"Odd Role"']
+    comment: "it's a policy"
+- kind: UserNetworkPolicyAttachment
+  group: user.example.dev
+  version: v1alpha1
+  plural: usernetworkpolicyattachments
+  shape: sql
+  read: {method: POST, path: /api/v2/statements}
+  terraform: [snowflake_network_policy_attachment]
+  sql:
+    mode: set
+    fields:
+      user: {type: identifier}
+      network_policy: {type: identifier}
+    create: ALTER USER {user} SET NETWORK_POLICY = {network_policy}
+    read:
+    - statement: SHOW PARAMETERS LIKE 'NETWORK_POLICY' IN USER {user}
+      match: {key: NETWORK_POLICY, level: USER}
+      columns: {network_policy: value}
+    delete: ALTER USER {user} UNSET NETWORK_POLICY
+  sample: {user: example_user, network_policy: example_policy}
+- kind: GrantPrivilegesToShare
+  group: share.example.dev
+  version: v1alpha1
+  plural: grantprivilegestoshares
+  shape: sql
+  read: {method: POST, path: /api/v2/statements}
+  terraform: [snowflake_grant_privileges_to_share]
+  sql:
+    mode: grant
+    fields:
+      privileges: {type: keywords}
+      on_database: {type: identifier}
+      to_share: {type: identifier}
+    create: GRANT {privileges} ON DATABASE {on_database} TO SHARE {to_share}
+    read:
+    - statement: SHOW GRANTS TO SHARE {to_share}
+      match: {privilege: "{privileges}", granted_on: DATABASE, name: "{on_database}"}
+    delete: REVOKE {privileges} ON DATABASE {on_database} FROM SHARE {to_share}
+  sample: {privileges: [USAGE, reference_usage], on_database: example_db, to_share: example_share}
+# A warehouse, a keyword turned on and off ({?is_secure}, {!is_secure}) and
+# a list of objects written element by element (materialized_views_gen.go).
+- kind: MaterializedView
+  group: materialized.example.dev
+  version: v1alpha1
+  plural: materializedviews
+  shape: sql
+  read: {method: POST, path: /api/v2/statements}
+  terraform: [snowflake_materialized_view]
+  writeOnly: [columns, statement, warehouse]
+  sql:
+    mode: object
+    id: [database, schema, name]
+    warehouse: warehouse
+    fields:
+      database: {type: identifier}
+      schema: {type: identifier}
+      name: {type: identifier}
+      warehouse: {type: identifier}
+      is_secure: {type: boolean}
+      columns:
+        type: objects
+        item:
+          template: "{name}[ COMMENT {comment}]"
+          fields: {name: {type: identifier}, comment: {type: string}}
+      comment: {type: string}
+      statement: {type: expression}
+    create: CREATE[ SECURE{?is_secure}] MATERIALIZED VIEW {@id}[ ({columns})][ COMMENT = {comment}] AS {statement}
+    read:
+    - statement: SHOW MATERIALIZED VIEWS LIKE {@like} IN SCHEMA {@parent}
+      match: {name: "{name}", database_name: "{database}", schema_name: "{schema}"}
+      columns: {comment: comment, is_secure: is_secure}
+    alter:
+      is_secure: ALTER MATERIALIZED VIEW {@id}[ SET SECURE{?is_secure}][ UNSET SECURE{!is_secure}]
+      comment: ALTER MATERIALIZED VIEW {@id} SET COMMENT = {comment}
+    unset:
+      comment: ALTER MATERIALIZED VIEW {@id} UNSET COMMENT
+    delete: DROP MATERIALIZED VIEW IF EXISTS {@id}
+  sample:
+    database: DB
+    schema: SC
+    name: example_view
+    warehouse: example_wh
+    is_secure: true
+    columns: [{name: id, comment: "the key, it's"}, {name: v}]
+    comment: example-comment
+    statement: SELECT id, v FROM DB.SC.T
+# A secret answered once, by the create (user_programmatic_access_tokens_gen.go:
+# addProgrammaticAccessTokenResultDBRow), and an object named by two fields.
+- kind: UserProgrammaticAccessToken
+  group: user.example.dev
+  version: v1alpha1
+  plural: userprogrammaticaccesstokens
+  shape: sql
+  read: {method: POST, path: /api/v2/statements}
+  terraform: [snowflake_user_programmatic_access_token]
+  secretOutputs: [token]
+  sql:
+    mode: object
+    id: [user_name, name]
+    fields:
+      user_name: {type: identifier}
+      name: {type: identifier}
+      comment: {type: string}
+      token: {type: string, output: true}
+    create: ALTER USER {user_name} ADD PROGRAMMATIC ACCESS TOKEN {name}[ COMMENT = {comment}]
+    createColumns: {token: token_secret}
+    read:
+    - statement: SHOW USER PROGRAMMATIC ACCESS TOKENS FOR USER {user_name}
+      match: {name: "{name}"}
+      columns: {comment: comment}
+    alter:
+      comment: ALTER USER {user_name} MODIFY PROGRAMMATIC ACCESS TOKEN {name} SET COMMENT = {comment}
+    unset:
+      comment: ALTER USER {user_name} MODIFY PROGRAMMATIC ACCESS TOKEN {name} UNSET COMMENT
+    delete: ALTER USER IF EXISTS {user_name} REMOVE PROGRAMMATIC ACCESS TOKEN {name}
+  sample: {user_name: example_user, name: example_token, comment: example-comment}
+# DESCRIBE USER answers every property, "null" for one not set
+# (users_ext.go, common_types.go toStringProperty).
+- kind: UserPublicKeys
+  group: user.example.dev
+  version: v1alpha1
+  plural: userpublickeys
+  shape: sql
+  read: {method: POST, path: /api/v2/statements}
+  terraform: [snowflake_user_public_keys]
+  writeOnly: [rsa_public_key]
+  sql:
+    mode: set
+    fields:
+      name: {type: identifier}
+      rsa_public_key: {type: string}
+      rsa_public_key_fp: {type: string, output: true}
+    create: ALTER USER {name} SET RSA_PUBLIC_KEY = {rsa_public_key}
+    read:
+    - statement: DESCRIBE USER {name}
+      properties: {name: property, value: value, "null": "null"}
+      columns: {rsa_public_key_fp: RSA_PUBLIC_KEY_FP}
+    delete: ALTER USER {name} UNSET RSA_PUBLIC_KEY
+  sample: {name: example_user, rsa_public_key: MIIBIjANBgkqh}
+# A setting whose delete names a field its create does not: ownership goes
+# back to the role the spec names (grants_gen.go GrantOwnershipOptions).
+- kind: GrantOwnership
+  group: grant.example.dev
+  version: v1alpha1
+  plural: grantownerships
+  shape: sql
+  read: {method: POST, path: /api/v2/statements}
+  terraform: [snowflake_grant_ownership]
+  sql:
+    mode: set
+    fields:
+      object_type: {type: keyword}
+      object_name: {type: name}
+      account_role_name: {type: identifier}
+      revertOwnershipToRole: {type: identifier}
+    create: GRANT OWNERSHIP ON {object_type} {object_name} TO ROLE {account_role_name}
+    read:
+    - statement: SHOW GRANTS ON {object_type} {object_name}
+      match: {privilege: OWNERSHIP, granted_to: ROLE, grantee_name: "{account_role_name}"}
+    delete: GRANT OWNERSHIP ON {object_type} {object_name} TO ROLE {revertOwnershipToRole} COPY CURRENT GRANTS
+  sample: {object_type: TABLE, object_name: db.sc.t, account_role_name: owner_role, revertOwnershipToRole: sysadmin}
+# An asynchronous object (openflow_runtimes_gen.go; pkg/resources/openflow_helpers.go
+# waits for its status): every statement is waited for, and a delete runs
+# TERMINATE, waits for DELETED, then drops it.
+- kind: OpenflowRuntime
+  group: openflow.example.dev
+  version: v1alpha1
+  plural: openflowruntimes
+  shape: sql
+  read: {method: POST, path: /api/v2/statements}
+  terraform: [snowflake_openflow_runtime]
+  sql:
+    mode: object
+    id: [database, schema, name]
+    fields:
+      database: {type: identifier}
+      schema: {type: identifier}
+      name: {type: identifier}
+      deployment: {type: identifier}
+      node_type: {type: string}
+      min_nodes: {type: integer}
+      max_nodes: {type: integer}
+      execute_as_role: {type: identifier}
+      comment: {type: string}
+      status: {type: string, output: true}
+    create: CREATE OPENFLOW RUNTIME {@id} IN DEPLOYMENT {deployment} NODE_TYPE = {node_type} MIN_NODES = {min_nodes} MAX_NODES = {max_nodes} EXECUTE_AS_ROLE = {execute_as_role}[ COMMENT = {comment}]
+    read:
+    - statement: SHOW OPENFLOW RUNTIMES LIKE {@like} IN SCHEMA {@parent}
+      match: {name: "{name}", database_name: "{database}", schema_name: "{schema}"}
+      columns: {status: status, deployment: deployment, node_type: node_type, min_nodes: min_nodes, max_nodes: max_nodes, execute_as_role: execute_as_role, comment: comment}
+    alter:
+      min_nodes: ALTER OPENFLOW RUNTIME {@id} SET MIN_NODES = {min_nodes}
+      max_nodes: ALTER OPENFLOW RUNTIME {@id} SET MAX_NODES = {max_nodes}
+      execute_as_role: ALTER OPENFLOW RUNTIME {@id} SET EXECUTE_AS_ROLE = {execute_as_role}
+      comment: ALTER OPENFLOW RUNTIME {@id} SET COMMENT = {comment}
+    unset:
+      comment: ALTER OPENFLOW RUNTIME {@id} UNSET COMMENT
+    delete: DROP OPENFLOW RUNTIME IF EXISTS {@id}
+    settle:
+      field: status
+      ready: [ACTIVE, SUSPENDED]
+      failed: [CREATE_FAILED, UPDATE_FAILED]
+      busy: [CREATING, UPDATING]
+      teardown:
+      - when: [DELETING]
+      - run: ALTER OPENFLOW RUNTIME IF EXISTS {@id} TERMINATE
+      gone: [DELETED]
+  sample:
+    database: DB
+    schema: SC
+    name: example_runtime
+    deployment: example_deployment
+    node_type: SMALL
+    min_nodes: 1
+    max_nodes: 3
+    execute_as_role: example_role
+    comment: example-comment

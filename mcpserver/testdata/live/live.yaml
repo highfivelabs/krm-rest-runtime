@@ -1,0 +1,12 @@
+secret: krm-live-example
+project: test-project
+target: Example sandbox org
+before:
+- {method: POST, path: "/orgs/{{cred:org}}/teams", body: {name: "{{run}}"}, save: {team: id}}
+kinds:
+- kind: Widget
+  spec: {org: "{{cred:org}}", name: "{{name}}", color: red, size: {width: 10}}
+- kind: Settings
+  skip: the sandbox org's settings are shared
+- kind: Gadget
+  fakeOnly: the example vendor sells gadgets only by contract

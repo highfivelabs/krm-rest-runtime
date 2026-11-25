@@ -1,0 +1,12 @@
+apiVersion: things.example.hfl.dev/v1alpha1
+kind: Widget
+metadata: {name: example-widget, namespace: default}
+spec: {org: acme, name: w1, color: blue}
+---
+apiVersion: things.example.hfl.dev/v1alpha1
+kind: Gadget
+metadata: {name: example-gadget, namespace: default}
+spec:
+  name: g1
+  fieldRefs:
+    widgetID: {kind: Widget, name: example-widget}
