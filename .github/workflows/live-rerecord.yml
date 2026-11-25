@@ -81,7 +81,7 @@ jobs:
           # anything else is a tag.
           if [[ $v =~ [-.][0-9]{14}-([0-9a-f]{12})$ ]]; then v=${BASH_REMATCH[1]}; fi
           echo "ref=$v" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: vendor/go.mod
           cache-dependency-path: vendor/go.sum
@@ -157,7 +157,7 @@ jobs:
         with:
           name: live-results-${{ github.run_id }}
           path: vendor/hack/live
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: vendor/go.mod
           cache-dependency-path: vendor/go.sum
