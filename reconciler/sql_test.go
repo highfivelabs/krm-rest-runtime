@@ -292,11 +292,12 @@ func TestSQLListAddRemove(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := newSQLHarness(t, k, map[string]any{"name": "fg", "allowed_databases": []any{"a"}})
-	obj, reason, msg, stmts := h.reconcile()
+	_, reason, msg, stmts := h.reconcile()
 	if reason != "Created" || !hasStmt(stmts, `ALTER FAILOVER GROUP "FG" ADD "A" TO ALLOWED_DATABASES`) {
 		t.Fatalf("create: %s %q %v", reason, msg, stmts)
 	}
-	if obj, reason, _, stmts = h.reconcile(); reason != "Unchanged" {
+	obj, reason, _, stmts := h.reconcile()
+	if reason != "Unchanged" {
 		t.Fatalf("resync: %s %v", reason, stmts)
 	}
 	h.setSpec(obj, "allowed_databases", []any{"b", "a", "c"})

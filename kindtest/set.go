@@ -112,9 +112,9 @@ func setSteps(t *testing.T, api *apifake.Server, k *descriptor.Kind, spec map[st
 		}
 	}
 
-	got := reconcile("create")
+	reconcile("create")
 	held("create", keys...)
-	got = reconcile("resync")
+	reconcile("resync")
 	held("resync", keys...)
 
 	// Drift: an element made outside the controller is removed.
@@ -124,7 +124,7 @@ func setSteps(t *testing.T, api *apifake.Server, k *descriptor.Kind, spec map[st
 	}
 	other, _ := k.Set.KeyOf(elsewhere)
 	api.Put(at(other), elsewhere)
-	got = reconcile("drift")
+	got := reconcile("drift")
 	held("drift", keys...)
 
 	// Drift of an element's field, where no call changes elements: refused

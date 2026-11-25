@@ -243,7 +243,7 @@ func redactRecords(path string, known *cassette.Known, check bool, w io.Writer) 
 		fmt.Fprintf(w, "%s: a reason holds a value to redact\n", path)
 		return 1, nil
 	}
-	if err := os.WriteFile(path, []byte(out), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(out), 0o644); err != nil { //nolint:gosec // rewrites a committed cassette in place, keeping it readable like the rest of the checkout
 		return 0, err
 	}
 	fmt.Fprintf(w, "rescrubbed %s\n", path)

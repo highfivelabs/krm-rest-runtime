@@ -9,6 +9,7 @@ package fake
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -1274,7 +1275,7 @@ func decodeMultipart(req *http.Request, ct string, k *descriptor.Kind) (map[stri
 	body := map[string]any{}
 	for {
 		part, err := mr.NextPart()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			if k.Multipart != nil {
 				for _, f := range k.Multipart.Files {
 					if _, ok := body[f]; !ok {

@@ -134,7 +134,9 @@ func liveCredentials(cfg *LiveConfig) ([]byte, string) {
 		return nil, fmt.Sprintf("live: no credentials: gcloud is not installed, so %s cannot be read (or set $%s)", where, EnvLiveCreds)
 	}
 	var stderr bytes.Buffer
-	cmd := exec.Command("gcloud", "secrets", "versions", "access", "latest", "--secret="+cfg.Secret, "--project="+cfg.Project, "--quiet")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "gcloud", "secrets", "versions", "access", "latest", "--secret="+cfg.Secret, "--project="+cfg.Project, "--quiet") //nolint:gosec // argv, not a shell: the secret and project names are single arguments to gcloud
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {

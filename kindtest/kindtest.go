@@ -175,7 +175,6 @@ func one(t *testing.T, f *descriptor.File, k *descriptor.Kind, vendor *rest.Vend
 			t.Fatalf("rotate: the old token %s is still in the API", path)
 		}
 		path = storedPath(t, api, k, got, spec)
-		stored, _ = api.Get(path)
 	}
 
 	// 2. Change a field and update (where the kind can be updated).
@@ -384,12 +383,12 @@ func assoc(t *testing.T, api *apifake.Server, k *descriptor.Kind, spec map[strin
 	r *reconciler.Reconciler, req ctrl.Request, reconcile func(string) *unstructured.Unstructured) {
 	t.Helper()
 	ctx := context.Background()
-	got := reconcile("create")
+	reconcile("create")
 	body := bodyOf(k, spec)
 	if _, ok := api.Get(apifake.AssocKey(k, body)); !ok {
 		t.Fatalf("create: link not in the API: %v", api.Paths())
 	}
-	got = reconcile("resync") // reading it back finds it: nothing new is sent
+	got := reconcile("resync") // reading it back finds it: nothing new is sent
 	if api.Len() != 1 {
 		t.Fatalf("resync: fake holds %d links, want 1: %v", api.Len(), api.Paths())
 	}
@@ -446,12 +445,12 @@ func unreadSteps(t *testing.T, api *apifake.Server, k *descriptor.Kind, spec map
 			}
 		}
 	}
-	got := reconcile("create")
+	reconcile("create")
 	if n := calls(); n != 1 {
 		t.Fatalf("create: %d calls, want the one write: %v", n, api.Calls)
 	}
 	sent("create", spec)
-	got = reconcile("resync")
+	got := reconcile("resync")
 	if n := calls(); n != 1 {
 		t.Fatalf("resync: %d calls, want none more (it is never read): %v", n, api.Calls)
 	}
@@ -473,7 +472,7 @@ func unreadSteps(t *testing.T, api *apifake.Server, k *descriptor.Kind, spec map
 		if err := c.Update(ctx, got); err != nil {
 			t.Fatal(err)
 		}
-		got = reconcile("update")
+		reconcile("update")
 		if n := calls(); n != 2 {
 			t.Fatalf("update: %d calls, want a second write: %v", n, api.Calls)
 		}

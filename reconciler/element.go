@@ -147,7 +147,7 @@ func (r *Reconciler) deleteElement(ctx context.Context, api *rest.Client, params
 	}
 	_, list, value, err := e.Of(named)
 	if err != nil {
-		return nil // nothing was applied
+		return nil //nolint:nilerr // an element that cannot be named was never applied, so there is nothing to delete
 	}
 	resp, err := ReadHolder(ctx, api, k, params)
 	if errors.Is(err, rest.ErrNotFound) {

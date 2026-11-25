@@ -725,10 +725,10 @@ func (r *liveRun) one(t *testing.T, f *descriptor.File, k *descriptor.Kind, lk *
 
 	// 1. Create, then read back: nothing should differ.
 	created = true
-	got, why := reconcile("create")
+	got, _ := reconcile("create")
 	params = paramsOf(got)
 	steps = append(steps, "create")
-	got, why = reconcile("read")
+	got, why := reconcile("read")
 	wantReason("read (right after create: the API should answer what was sent)", why, "Unchanged")
 	steps = append(steps, "read")
 
@@ -1310,7 +1310,7 @@ func (r *liveRun) writeRecords(t *testing.T) {
 		path = filepath.Join("hack", "live", "records.json")
 	}
 	all := map[string]LiveRecord{}
-	if data, err := os.ReadFile(path); err == nil {
+	if data, err := os.ReadFile(path); err == nil { //nolint:gosec // the test run chooses this path (an env override of the repository default)
 		if err := json.Unmarshal(data, &all); err != nil {
 			t.Errorf("live: %s: %v", path, err)
 			return
@@ -1323,12 +1323,12 @@ func (r *liveRun) writeRecords(t *testing.T) {
 		v.Reason = r.known.Redact(v.Reason) // what a later segment taught
 		all[k] = v
 	}
-	data, _ := json.MarshalIndent(all, "", "  ") // map keys are sorted
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	data, _ := json.MarshalIndent(all, "", "  ")                   // map keys are sorted
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil { //nolint:gosec // hack/live/records.json is committed, readable like the rest of the checkout
 		t.Errorf("live: %v", err)
 		return
 	}
-	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
+	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil { //nolint:gosec // hack/live/records.json is committed, readable like the rest of the checkout
 		t.Errorf("live: %v", err)
 		return
 	}

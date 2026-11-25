@@ -81,7 +81,7 @@ func TestSQLSettleCreateAndUpdate(t *testing.T) {
 	h.setSpec(obj, "min_nodes", float64(2))
 	var all []string
 	for i := 0; ; i++ {
-		obj, reason, msg, stmts = h.reconcile()
+		_, reason, msg, stmts = h.reconcile()
 		all = append(all, stmts...)
 		if reason != SettlingReason {
 			break
@@ -101,18 +101,18 @@ func TestSQLSettleCreateAndUpdate(t *testing.T) {
 	rec := h.api.SQLRecords("OpenflowRuntime")[0]
 	rec["status"] = "UPDATING"
 	h.setSpec(obj, "comment", "c2")
-	if obj, reason, _, stmts = h.reconcile(); reason != SettlingReason || countStmt(stmts, "ALTER") != 0 {
+	if _, reason, _, stmts = h.reconcile(); reason != SettlingReason || countStmt(stmts, "ALTER") != 0 {
 		t.Fatalf("busy: %s %v", reason, stmts)
 	}
 	// A wait longer than the timeout is an error, retried with backoff.
 	h.r.Now = func() time.Time { return time.Now().Add(31 * time.Minute) }
-	if obj, reason, msg, _ = h.reconcile(); reason != "SyncFailed" || !strings.Contains(msg, "longer than 30m0s") {
+	if _, reason, msg, _ = h.reconcile(); reason != "SyncFailed" || !strings.Contains(msg, "longer than 30m0s") {
 		t.Fatalf("timeout: %s %q", reason, msg)
 	}
 	h.r.Now = nil
 	rec["status"] = "ACTIVE"
 	for i := 0; i < 4 && reason != "Updated"; i++ {
-		obj, reason, _, _ = h.reconcile()
+		_, reason, _, _ = h.reconcile()
 	}
 	if reason != "Updated" || rec["comment"] != "c2" {
 		t.Fatalf("after the wait: %s, comment %v", reason, rec["comment"])
@@ -120,7 +120,7 @@ func TestSQLSettleCreateAndUpdate(t *testing.T) {
 
 	// A failure status is an error, not a wait.
 	rec["status"] = "CREATE_FAILED"
-	if obj, reason, msg, _ = h.reconcile(); reason != "SyncFailed" || !strings.Contains(msg, "CREATE_FAILED") {
+	if _, reason, msg, _ = h.reconcile(); reason != "SyncFailed" || !strings.Contains(msg, "CREATE_FAILED") {
 		t.Fatalf("failed: %s %q", reason, msg)
 	}
 	rec["status"] = "ACTIVE"

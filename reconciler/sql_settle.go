@@ -295,7 +295,7 @@ func (r *Reconciler) syncSQLSettle(ctx context.Context, sk *sqlapi.Kind, params 
 		switch {
 		case descriptor.SettleIn(set.Failed, status):
 			finish(false)
-			return obs, "failed", fmt.Errorf("Snowflake reports status %s; delete and recreate the object", status)
+			return obs, "failed", fmt.Errorf("Snowflake reports status %s; delete and recreate the object", status) //nolint:staticcheck // ST1005: Snowflake is a proper noun, and the other status messages read the same
 		case descriptor.SettleIn(set.Busy, status):
 			return wait(obs, fmt.Sprintf("Snowflake reports status %s; waiting for %s", status, strings.Join(set.Ready, " or ")))
 		}

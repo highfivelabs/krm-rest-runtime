@@ -90,7 +90,7 @@ func (r *Rotate) Durations(spec map[string]any) (lifetime, window time.Duration,
 			d = time.Duration(n) * time.Second
 		} else {
 			if d, err = time.ParseDuration(strings.TrimSpace(Text(v))); err != nil {
-				return 0, fmt.Errorf("spec.%s: a duration such as 24h or 1h30m: %v", f, err)
+				return 0, fmt.Errorf("spec.%s: a duration such as 24h or 1h30m: %w", f, err)
 			}
 		}
 		if d < 0 {
