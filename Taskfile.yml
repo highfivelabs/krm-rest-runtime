@@ -1,0 +1,24 @@
+# Copyright 2026 High Five Labs
+# SPDX-License-Identifier: Apache-2.0
+#
+# check never runs live code: -tags live is only vetted, and only the
+# runtime's own live tests (against an httptest fake on 127.0.0.1) run with
+# it. Live runs against vendors are the vendor repositories' live:* tasks.
+version: "3"
+
+env:
+  GOTOOLCHAIN: go1.25.0+auto
+
+tasks:
+  check:
+    desc: Everything CI checks (hack/ci.sh); add --report output to each PR
+    cmds:
+      - hack/ci.sh {{.CLI_ARGS}}
+
+  live:secret:
+    desc: "Store a vendor's live-test credentials JSON from stdin as Secret Manager secret krm-live-VENDOR (task live:secret VENDOR=github)"
+    requires:
+      vars: [VENDOR]
+    interactive: true
+    cmds:
+      - hack/live-secret.sh {{.VENDOR}} {{.PROJECT}}

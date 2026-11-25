@@ -1,0 +1,234 @@
+# Copyright 2026 High Five Labs
+# SPDX-License-Identifier: Apache-2.0
+#
+# The nightly live re-record, shared by every vendor repository (docs/live.md,
+# "Replay"). Two jobs:
+#
+#   live     the live tests against the vendor's real account. The only job
+#            with a Google identity, and the only one that sees credentials.
+#            Its output goes to the step log only (credentials masked there);
+#            it hands on only records.json and the cassettes, which the
+#            runtime scrubbed, redacted and checked for leaks before writing.
+#            gitleaks scans them before they leave the job.
+#   publish  no Google identity: readiness regenerated from the records, a
+#            replay of what was just recorded, a second secret scan, and a
+#            pull request with what changed (a draft when anything failed).
+#
+# A vendor's .github/workflows/live.yml calls it, pinned to a commit:
+#
+#   jobs:
+#     live:
+#       uses: highfivelabs/krm-rest-runtime/.github/workflows/live-rerecord.yml@<sha> # v0.20.0
+#       with: {display-name: Cloudflare, kinds: "${{ inputs.kinds }}", ...}
+#
+# Credentials: no stored keys. Workload Identity Federation lets the vendor
+# repository's main branch, through this workflow only (job_workflow_ref),
+# act as the live-runner service account, which reads the vendor's
+# krm-live-<vendor> secret (and any secret its live_test.go names, such as
+# Datadog's integrations).
+name: live-rerecord
+
+on:
+  workflow_call:
+    inputs:
+      display-name:
+        description: The vendor as people say it (Cloudflare, MongoDB Atlas)
+        type: string
+        required: true
+      kinds:
+        description: Only these kinds (KRM_LIVE_KINDS, comma-separated); empty for all
+        type: string
+        default: ""
+      wif-provider:
+        description: The Workload Identity Federation provider (the caller's vars.GCP_LIVE_WIF_PROVIDER)
+        type: string
+        required: true
+      service-account:
+        description: The live-runner service account (the caller's vars.GCP_LIVE_SERVICE_ACCOUNT)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    if: inputs.wif-provider != '' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation: this job only
+    outputs:
+      outcome: ${{ steps.live.outcome }}
+      runtime: ${{ steps.runtime.outputs.ref }}
+    defaults:
+      run:
+        shell: bash # -eo pipefail
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: vendor
+          persist-credentials: false
+      - name: The runtime version go.mod pins
+        id: runtime
+        working-directory: vendor
+        run: |
+          # Either form: "require M v", or a line of a require ( ... ) block.
+          v=$(awk -v m=github.com/highfivelabs/krm-rest-runtime '$1 == "require" && $2 == m {print $3} $1 == m {print $2}' go.mod | head -1)
+          if [[ -z $v ]]; then echo "::error::go.mod does not require github.com/highfivelabs/krm-rest-runtime"; exit 1; fi
+          # A pseudo-version names its commit last (v0.19.2-0.20261121053202-6d5c3b6c94b7);
+          # anything else is a tag.
+          if [[ $v =~ [-.][0-9]{14}-([0-9a-f]{12})$ ]]; then v=${BASH_REMATCH[1]}; fi
+          echo "ref=$v" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: vendor/go.mod
+          cache-dependency-path: vendor/go.sum
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ inputs.wif-provider }}
+          service_account: ${{ inputs.service-account }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Live tests (record)
+        id: live
+        working-directory: vendor
+        env:
+          KRM_LIVE: "1"
+          KRM_LIVE_REQUIRE: "1" # no credentials is a failure here, not a skip
+          KRM_LIVE_KINDS: ${{ inputs.kinds }}
+        # Output goes to the step log only, never to a file: credentials are
+        # masked there, and raw failure reasons quote the API. A failing kind
+        # fails the step, but its result is still recorded (and its last
+        # passing cassette kept): publish runs anyway.
+        run: go test -tags live -run TestEveryKindLive -timeout 55m -v .
+        continue-on-error: true
+
+      # A second, independent check before the results leave the job: a
+      # finding stops it, and nothing is uploaded.
+      # Only a finding stops it: if gitleaks cannot be installed, the scan is
+      # skipped with a warning (the runtime's own leak check already ran, and
+      # publish scans again before anything is pushed).
+      - name: Secret scan of the results
+        working-directory: vendor
+        run: |
+          for i in 1 2 3; do go install github.com/zricethezav/gitleaks/v8@v8.30.1 && break; sleep 15; done
+          gl="$(go env GOPATH)/bin/gitleaks"
+          if [[ ! -x $gl ]]; then echo "::warning::gitleaks could not be installed: results not scanned here"; exit 0; fi
+          "$gl" dir --no-banner --redact hack/live
+
+      # Only what the live run wrote for the repository: scrubbed, redacted
+      # and leak-checked by the runtime before it was written.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: live-results-${{ github.run_id }}
+          path: |
+            vendor/hack/live/records.json
+            vendor/hack/live/cassettes/
+          retention-days: 7
+
+  publish:
+    needs: live
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write # the branch the pull request comes from
+      pull-requests: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: vendor
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: highfivelabs/krm-rest-runtime
+          path: krm-rest-runtime
+          fetch-depth: 0 # a pseudo-version's 12-character commit is checked out below
+          persist-credentials: false
+      - name: The generator go.mod pins
+        env:
+          REF: ${{ needs.live.outputs.runtime }}
+        run: git -C krm-rest-runtime checkout --quiet "$REF"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: live-results-${{ github.run_id }}
+          path: vendor/hack/live
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: vendor/go.mod
+          cache-dependency-path: vendor/go.sum
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - run: pip install pyyaml==6.0.3
+
+      - name: Regenerate readiness from the records
+        id: generate
+        working-directory: vendor
+        env:
+          RUNTIME: ${{ github.workspace }}/krm-rest-runtime
+        run: hack/gen/generate.sh
+        continue-on-error: true # a spec changed upstream: report it, keep the night's results
+
+      - name: Replay what was just recorded
+        id: replay
+        working-directory: vendor
+        run: go test -run TestEveryKindReplay -v . 2>&1 | tee "$RUNNER_TEMP/replay.log"
+        continue-on-error: true
+
+      # A second, independent check before anything is committed: a finding
+      # stops the job, and nothing is pushed.
+      - name: Secret scan of the results
+        working-directory: vendor
+        run: |
+          for i in 1 2 3; do go install github.com/zricethezav/gitleaks/v8@v8.30.1 && break; sleep 15; done
+          "$(go env GOPATH)/bin/gitleaks" dir --no-banner --redact hack/live # must run here: nothing is pushed unscanned
+
+      - uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
+        with:
+          path: vendor
+          # A run of some kinds only gets its own branch, so it does not
+          # reset a nightly pull request still open.
+          branch: ${{ inputs.kinds == '' && 'chore/live-rerecord' || format('chore/live-rerecord-{0}', github.run_id) }}
+          delete-branch: true
+          # Anything failed: a draft, to be read before it can merge; also an
+          # open pull request from an earlier night (always-true).
+          draft: ${{ (needs.live.outputs.outcome != 'success' || steps.generate.outcome != 'success' || steps.replay.outcome != 'success') && 'always-true' || 'false' }}
+          add-paths: |
+            hack/live/records.json
+            hack/live/cassettes/**
+            types.yaml
+            config/crds/**
+            zz_generated.report.md
+          commit-message: "Re-record live tests against ${{ inputs.display-name }}"
+          title: "Re-record live tests against ${{ inputs.display-name }}${{ inputs.kinds != '' && format(' ({0})', inputs.kinds) || '' }}"
+          body: |
+            The live run's results (`hack/live/records.json`), the cassettes
+            `TestEveryKindReplay` plays (`hack/live/cassettes/`), and readiness
+            regenerated from the records.
+
+            | step | outcome |
+            | --- | --- |
+            | live | **${{ needs.live.outputs.outcome }}** |
+            | regenerate | **${{ steps.generate.outcome }}** |
+            | replay | **${{ steps.replay.outcome }}** |
+
+            Every re-record changes IDs, timestamps and `recorded`; a cassette
+            diff beyond those means ${{ inputs.display-name }} answers differently
+            now: worth a read. Logs: the run's `live` job.
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Fail if a step failed
+        if: needs.live.outputs.outcome == 'failure' || steps.generate.outcome == 'failure' || steps.replay.outcome == 'failure'
+        env:
+          LIVE: ${{ needs.live.outputs.outcome }}
+          GENERATE: ${{ steps.generate.outcome }}
+          REPLAY: ${{ steps.replay.outcome }}
+        run: |
+          grep -E '^\s*--- FAIL' "$RUNNER_TEMP/replay.log" || true
+          echo "live: $LIVE, regenerate: $GENERATE, replay: $REPLAY"
+          exit 1
