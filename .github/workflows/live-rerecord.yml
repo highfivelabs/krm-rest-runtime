@@ -113,7 +113,7 @@ jobs:
       - name: Secret scan of the results
         working-directory: vendor
         run: |
-          for i in 1 2 3; do go install github.com/zricethezav/gitleaks/v8@v8.30.1 && break; sleep 15; done
+          for _ in 1 2 3; do go install github.com/zricethezav/gitleaks/v8@v8.30.1 && break; sleep 15; done
           gl="$(go env GOPATH)/bin/gitleaks"
           if [[ ! -x $gl ]]; then echo "::warning::gitleaks could not be installed: results not scanned here"; exit 0; fi
           "$gl" dir --no-banner --redact hack/live
@@ -185,7 +185,7 @@ jobs:
       - name: Secret scan of the results
         working-directory: vendor
         run: |
-          for i in 1 2 3; do go install github.com/zricethezav/gitleaks/v8@v8.30.1 && break; sleep 15; done
+          for _ in 1 2 3; do go install github.com/zricethezav/gitleaks/v8@v8.30.1 && break; sleep 15; done
           "$(go env GOPATH)/bin/gitleaks" dir --no-banner --redact hack/live # must run here: nothing is pushed unscanned
 
       - uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3

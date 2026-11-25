@@ -11,7 +11,7 @@ env:
 
 tasks:
   check:
-    desc: Everything CI checks (hack/ci.sh); add --report output to each PR
+    desc: Everything CI checks (hack/ci.sh), as the ci check runs it
     cmds:
       - hack/ci.sh {{.CLI_ARGS}}
 

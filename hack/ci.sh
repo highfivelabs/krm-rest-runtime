@@ -2,9 +2,9 @@
 # Copyright 2026 High Five Labs
 # SPDX-License-Identifier: Apache-2.0
 #
-# Everything CI checks, in one place: .github/workflows/ci.yml runs this
-# script, and so does anyone opening a pull request. Until CI runs on every
-# pull request, each one carries the --report output in its description.
+# Everything CI checks, in one place: the hermetic check of
+# .github/workflows/hfl-ci.yml (krm-ci's krm-ci.yml) runs this script, and so
+# can anyone before opening a pull request.
 #
 #   hack/ci.sh            run the checks
 #   hack/ci.sh --report   run them and print a Markdown proof for the PR
