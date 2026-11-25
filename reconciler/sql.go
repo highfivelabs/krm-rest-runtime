@@ -177,7 +177,6 @@ func (r *Reconciler) syncSQLSet(ctx context.Context, sk *sqlapi.Kind, body, prev
 		if err := sk.Delete(ctx, prev, nil); err != nil && !errors.Is(err, rest.ErrNotFound) {
 			return nil, "", fmt.Errorf("unsetting the previous setting: %w", err)
 		}
-		prev = nil
 	}
 	obs, err := sk.Read(ctx, body, nil)
 	action := "updated"

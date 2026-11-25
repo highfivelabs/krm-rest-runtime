@@ -67,10 +67,10 @@ func elementSteps(t *testing.T, api *apifake.Server, k *descriptor.Kind, spec ma
 	}
 
 	// 1. Create: the element is in its list.
-	got := reconcile("create")
+	reconcile("create")
 	body := bodyOf(k, spec)
 	has("create", body, true)
-	got = reconcile("resync")
+	got := reconcile("resync")
 
 	// 2. Change it: a bare value becomes another one (the old one goes); an
 	// object's field changes in place.

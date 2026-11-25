@@ -97,14 +97,14 @@ func Load(path string) (*Cassette, error) {
 
 // Save writes a cassette, indented, so a re-recording diffs line by line.
 func (c *Cassette) Save(path string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil { //nolint:gosec // cassettes are committed to the repository and read like any other file in the checkout
 		return err
 	}
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(data, '\n'), 0o644)
+	return os.WriteFile(path, append(data, '\n'), 0o644) //nolint:gosec // cassettes are committed to the repository and read like any other file in the checkout
 }
 
 // minScrub is the shortest value Scrubber replaces: a shorter one ("1",

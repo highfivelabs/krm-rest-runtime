@@ -83,7 +83,7 @@ func TestSQLSettingsFieldByField(t *testing.T) {
 
 	// One field changes: one statement; the policy is unset first.
 	h.setSpec(obj, "password_policy", "db.sc.p2")
-	obj, reason, msg, stmts = h.reconcile()
+	_, reason, msg, stmts = h.reconcile()
 	var alters []string
 	for _, s := range stmts {
 		if strings.HasPrefix(s, "ALTER") {

@@ -69,7 +69,7 @@ func Rehearse(t *testing.T, typesYAML []byte, vendor *rest.Vendor, hooks map[str
 	}
 
 	if os.Getenv(EnvFakeRecord) != "1" {
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if _, err := os.Stat(dir); os.IsNotExist(err) { //nolint:gosec // the test run chooses this path (an env override of the repository default)
 			t.Skipf("rehearsal: no cassettes in %s yet: record them with %s=1 go test -run %s", dir, EnvFakeRecord, t.Name())
 		}
 		r := newReplayFrom(t, vendor, cfg, dir)
@@ -100,16 +100,16 @@ func Rehearse(t *testing.T, typesYAML []byte, vendor *rest.Vendor, hooks map[str
 	r.getenv = func(k string) string { return "rehearsal-env-" + k }
 	r.vclock = rehearsalDate
 	r.sleep = func(d time.Duration) { r.vclock = r.vclock.Add(d) }
-	if err := os.RemoveAll(dir); err != nil { // a kind that is gone leaves no cassette behind
+	if err := os.RemoveAll(dir); err != nil { //nolint:gosec // a kind that is gone leaves no cassette behind; the test run chooses this path (an env override of the repository default)
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // cassettes are committed, readable like the rest of the checkout
 		t.Fatal(err)
 	}
 	r.cassettes = dir
 	r.recorder = &cassette.Recorder{Base: r.api.BaseURL}
 	r.setTransport(r.recorder)
-	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte(fakeReadme), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte(fakeReadme), 0o644); err != nil { //nolint:gosec // cassettes are committed, readable like the rest of the checkout
 		t.Fatal(err)
 	}
 	r.runKinds(t, f, hooks)

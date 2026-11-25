@@ -89,7 +89,7 @@ func TestRotatingToken(t *testing.T) {
 
 	// Ten seconds before the window: read, nothing made, requeued for it.
 	posts := len(rec.calls)
-	after, obj = reconcileAt(t0.Add(23*time.Hour - 10*time.Second))
+	after, _ = reconcileAt(t0.Add(23*time.Hour - 10*time.Second))
 	for _, call := range rec.calls[posts:] {
 		if call.Method != "GET" {
 			t.Fatalf("before the window: %s %s", call.Method, call.Path)

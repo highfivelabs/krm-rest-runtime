@@ -114,7 +114,7 @@ func sqlSteps(t *testing.T, api *apifake.Server, k *descriptor.Kind, spec map[st
 		if err := c.Update(ctx, got); err != nil {
 			t.Fatal(err)
 		}
-		got = settle("update")
+		settle("update")
 		waited("update")
 		rec = only("update")
 		if rec[field] != "changed-"+field {

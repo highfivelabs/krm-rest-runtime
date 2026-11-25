@@ -3,7 +3,7 @@
 package fake
 
 import (
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // not for security: the fake makes a stable 24-hex ID, as the vendor API does
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
@@ -288,7 +288,7 @@ func (s *Server) serveBatch(w http.ResponseWriter, rt *route, path string, body 
 // BatchValue is the form the fake answers a batch list's value in: a
 // 24-hex ID made from it, as Atlas answers a zone's ID for its name.
 func BatchValue(v string) string {
-	sum := sha1.Sum([]byte(v))
+	sum := sha1.Sum([]byte(v)) //nolint:gosec // not for security: a stable ID for a value, nothing more
 	return hex.EncodeToString(sum[:12])
 }
 

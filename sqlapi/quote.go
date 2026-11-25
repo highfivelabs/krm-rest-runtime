@@ -33,7 +33,6 @@ var (
 	plainIdent = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$]*$`)
 	keywordRE  = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 	datatypeRE = regexp.MustCompile(`^[A-Z][A-Z0-9_]*( [A-Z][A-Z0-9_]*)*( ?\( *[A-Z0-9_]+( *, *[A-Z0-9_]+)* *\))?$`)
-	numberRE   = regexp.MustCompile(`^-?[0-9]+(\.[0-9]+)?$`)
 )
 
 // Ident is the exact name a spec value names, as Snowflake stores it: a

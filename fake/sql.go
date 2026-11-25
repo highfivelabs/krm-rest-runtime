@@ -304,7 +304,7 @@ func (st *sqlState) exec(stmt, handle, warehouse string) (int, any, bool) {
 	}
 	sort.SliceStable(hits, func(i, j int) bool { return hits[i].lit > hits[j].lit })
 	// (Settings set field by field need one only to read: POLICY_REFERENCES.)
-	if warehouse == "" && hits[0].sk.k.SQL.Warehouse != "" && !(hits[0].sk.k.SQL.PerField() && hits[0].op != "read") {
+	if warehouse == "" && hits[0].sk.k.SQL.Warehouse != "" && (!hits[0].sk.k.SQL.PerField() || hits[0].op == "read") {
 		// A kind that names a warehouse runs a query (a materialized view's
 		// CREATE): Snowflake refuses it in a session with none.
 		return 422, sqlFailure("000606", "No active warehouse selected in the current session.  Select an active warehouse with the 'use warehouse' command.", handle), false
