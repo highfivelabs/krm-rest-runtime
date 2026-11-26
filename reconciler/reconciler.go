@@ -79,6 +79,23 @@ type Reconciler struct {
 
 func (r *Reconciler) finalizer() string { return r.Kind.Group + "/finalizer" }
 
+// Annotations an object may carry, the same for every kind. They let an
+// object take over a resource that exists already, as a Terraform
+// offramp does, without making or deleting anything.
+const (
+	// AnnAdoptID names the existing resource a CRUD kind's object stands
+	// for, by the ID status.id would hold (the item path's ID parameter).
+	// Read while status.id is empty: the first reconcile reads the resource
+	// by it, rather than creating one, and records it in status.id. A kind
+	// whose path is all spec fields (an upsert, a settings kind) needs
+	// none: it is read before it is written.
+	AnnAdoptID = "krm.hfl.dev/adopt-id"
+	// AnnDeletionPolicy "abandon" leaves the resource when the object is
+	// deleted: the finalizer goes, no delete is sent. Anything else, or
+	// none, deletes it (the default).
+	AnnDeletionPolicy = "krm.hfl.dev/deletion-policy"
+)
+
 // SetupWithManager registers the controller.
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if r.Kind.IsDraft() {
@@ -132,6 +149,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if deleting {
 		if !controllerutil.ContainsFinalizer(obj, r.finalizer()) {
 			return ctrl.Result{}, nil
+		}
+		if obj.GetAnnotations()[AnnDeletionPolicy] == "abandon" {
+			controllerutil.RemoveFinalizer(obj, r.finalizer())
+			return ctrl.Result{}, r.Client.Update(ctx, obj)
 		}
 		specBody := func() (map[string]any, error) { return r.body(ctx, obj, spec) }
 		del := r.delete
@@ -1080,6 +1101,8 @@ func (r *Reconciler) params(obj *unstructured.Unstructured, spec map[string]any)
 	}
 	if r.Kind.ID != nil {
 		if id, _, _ := unstructured.NestedString(obj.Object, "status", "id"); id != "" {
+			out[r.Kind.ID.Param] = id
+		} else if id := obj.GetAnnotations()[AnnAdoptID]; id != "" {
 			out[r.Kind.ID.Param] = id
 		}
 	}

@@ -958,6 +958,18 @@ gone (remove its `draftNotes` entry; generation says so). Then run
   in its hand-written vendor.go.
 - Errors the API calls the caller's fault (4xx but 429) are not retried
   until the spec changes or the next resync.
+- Two annotations, on any kind, let an object take over a resource that
+  exists already without making or deleting anything (a Terraform offramp):
+  - `krm.hfl.dev/adopt-id: <id>` names the resource a CRUD kind's object
+    stands for, by the ID `status.id` would hold. While `status.id` is
+    empty the first reconcile reads the resource by it instead of creating
+    one, records it in `status.id`, and writes only what the spec changes
+    (nothing, when the spec is the resource). Upsert and settings kinds,
+    whose path is all spec fields, need none: they are read before they are
+    written.
+  - `krm.hfl.dev/deletion-policy: abandon` leaves the resource when the
+    object is deleted: the finalizer goes, no delete is sent. Anything
+    else, or none, deletes it.
 
 ## What the tests prove
 
