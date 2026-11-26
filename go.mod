@@ -5,7 +5,7 @@ go 1.27.0
 toolchain go1.27.4
 
 require (
-	github.com/go-logr/logr v1.4.3
+	github.com/go-logr/logr v1.4.4
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	k8s.io/api v0.35.0
 	k8s.io/apiextensions-apiserver v0.35.0
