@@ -76,7 +76,7 @@ them (`roles/secretmanager.secretAccessor` on each secret, not the project):
 | gitlab | none (`krm-live-gitlab` for a hosted one) | `token`, `baseURL` | `hack/live/gitlab-ce.sh`: GitLab CE in Docker, admin token |
 | cloudflare | `krm-live-cloudflare` | `apiToken`, `accountId`, `zoneId`, `zoneName` | a new account for tests; a zone of your own (its domain is `zoneName`) |
 | datadog | `krm-live-datadog` | `apiKey`, `appKey`, `site` | a new trial org on US5 for tests |
-| sentry | `krm-live-sentry` | `token`, `org` | the company's own org, reused: the tests touch only `hfl-live-` names |
+| sentry | `krm-live-sentry` | `token`, `org` | a dedicated test organization; internal integration token ([live-accounts/sentry.md](live-accounts/sentry.md)) |
 
 Keys used only to keep names out of recordings (`zoneName`, `subdomain`,
 `orgName`) are scrubbed like every credential: a recording holds

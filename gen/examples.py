@@ -31,6 +31,33 @@ live-test example already shows the kind, this writes
 examples/<Kind>/with-<Target>.yaml the same way: the target from its own
 spec, and the kind with spec.fieldRefs taking the target's ID.
 
+Terraform's names are not always ours (GitHub's repository is our repo).
+Where no field has the reference's name, the kind's path says which field
+it is: where the kind's own path runs through the target's item path
+(/repos/{owner}/{repo}/actions/secrets/{secret_name} through Repository's
+/repos/{owner}/{id}), the field at the target's ID takes the target's ID,
+and the fields at its other parameters take the target's own values (the
+owner they share). A target is made from its own Upjet references too
+(unless a live test shows it, or its own example is skipped), so that a
+parent the kind and its targets share is one object: Cloudflare's
+QueueConsumer, its Queue and both their accounts are one Account. Where
+two references would still give one field different values, there is no
+example, and the reason is printed.
+
+A target with no status.id (an upsert) is named by a spec field: the
+one its read path ends in, where the kind's path runs through it
+(ActionsOrganizationSecret's secretName), or the one Upjet's
+ExtractParamPath("x", false) names. The kind takes that field by
+reference (fieldPath: spec.<field>). Where the kind's live test takes the
+field from the target's own create or read call (GitHub's repository
+node_id, which GraphQL kinds name it by), the example takes the same
+value from the target's status.
+
+An extractor other than Upjet's default counts where it gives the same
+ID: Upjet's ExtractResourceID(), its ExtractParamPath on the field our ID
+is from, or a provider's <Kind>ID() in the target's own API package
+(Okta's GroupID()) where our ID is the API's id.
+
 Not every such reference is our status.id (Upjet's default extractor is
 the target's external name, which for some kinds is its name). One that
 does not hold on the fake is listed, with why, in
@@ -189,10 +216,146 @@ def norm(s):
     return re.sub(r"[^a-z0-9]", "", s.lower())
 
 
+PARAM = re.compile(r"^\{([^}]+)\}$")
+
+
+def rest_paths(k, ops=("read", "create")):
+    """k's REST paths (not GraphQL's one endpoint)."""
+    return [op["path"] for op in (k.get(o) for o in ops) if op and op.get("path") and not op.get("graphql")]
+
+
+def aligned(k, t):
+    """{k field: t's API param} where k's own path runs through t's item
+    path (t's read): the same literal segments, a parameter of k's at each
+    of t's. Such a field holds what t's path holds there: at t's ID, t's
+    ID (GitHub's /repos/{owner}/{repo}/actions/secrets/... runs through
+    Repository's /repos/{owner}/{id}, so repo is the repository's ID and
+    owner its owner). None where no path of k runs through t's."""
+    tpaths = rest_paths(t, ("read",))
+    if not tpaths:
+        return None
+    ts = tpaths[0].split("?")[0].strip("/").split("/")
+    field = {p["name"]: p["field"] for p in k.get("params") or []}
+    for path in rest_paths(k):
+        ks = path.split("?")[0].strip("/").split("/")
+        if len(ks) < len(ts):
+            continue
+        out = {}
+        for a, b in zip(ts, ks):
+            pa, pb = PARAM.match(a), PARAM.match(b)
+            if bool(pa) != bool(pb) or (not pa and a != b):
+                out = None
+                break
+            if pa:
+                f = field.get(pb.group(1))
+                if not f or "." in f:
+                    out = None  # k's own ID, or a nested field: fieldRefs can't fill it
+                    break
+                out[f] = pa.group(1)
+        if out:
+            return out
+    return None
+
+
+UPJET = "github.com/crossplane/upjet/"
+PARAM_PATH = re.compile(r'\.ExtractParamPath\("([^"]+)",\s*(true|false)\)$')
+KIND_ID = re.compile(r'/apis/([a-z0-9]+)/v[0-9a-z]+\.([A-Za-z0-9]+)ID\(\)$')
+
+
+def takes_id(r, t):
+    """Whether the reference's extractor gives the target's ID, our
+    status.id. Upjet's default and its ExtractResourceID() give the
+    external name; ExtractParamPath("x", ...) the target's x, the ID where
+    x is the field our ID is from (GitHub's team slug); a provider's own
+    <Kind>ID() in the target's API package (Okta's GroupID(), in
+    apis/group), its kind's ID, ours where our ID is the API's id. Any
+    other extractor is code we can't see: no."""
+    x = r.get("extractor")
+    tid = t.get("id") or {}
+    if not tid:
+        return False  # no status.id
+    if not x or (x.startswith(UPJET) and x.endswith("/resource.ExtractResourceID()")):
+        return True
+    m = PARAM_PATH.search(x)
+    if m and x.startswith(UPJET):
+        return norm(m.group(1)) == norm(tid.get("from", "").split("/")[-1])
+    m = KIND_ID.search(x)
+    if m:
+        tg, _, tk = (r.get("targetKind") or "").partition("/")
+        tf = r.get("target", "").partition("_")[2]
+        return (m.group(1) == tg.split(".")[0] and norm(m.group(2)) in (norm(tk), norm(tf))
+                and norm(tid.get("from", "")) == "id")
+    return False
+
+
+def own_name(t):
+    """The API parameter that names t, a kind with no ID of its own (an
+    upsert): the one its read path ends in (GitHub's
+    /orgs/{org}/actions/secrets/{secret_name}), else None."""
+    paths = rest_paths(t, ("read",))
+    m = PARAM.match(paths[0].split("?")[0].rstrip("/").split("/")[-1]) if paths else None
+    return m and m.group(1)
+
+
+def live_value(v, k, f, t):
+    """What of t k's live test gives f, as a how (see upjet_refs), or False
+    where it doesn't say: f is {{var:x}}, saved from t's own create or read
+    (GitHub's BranchProtection takes repositoryId from the repository's
+    read, its node_id). The live test ran against the real API, so this is
+    what the API takes."""
+    lk = v.live_kind(k)
+    val = ((lk or {}).get("spec") or {}).get(f)
+    m = VAR.fullmatch(val) if isinstance(val, str) else None
+    if not m:
+        return False
+    calls = (v.live.get("before") or []) + (lk.get("before") or [])
+    call = next((c for c in calls if m.group(1) in (c.get("save") or {})), None)
+    if not call:
+        return False
+    path = TEMPLATE.sub("X", call["path"].split("?")[0])
+    if not any(op and not op.get("graphql") and op["method"].upper() == call["method"].upper() and path_re(op["path"]).match(path)
+               for op in (t.get("create"), t.get("read"))):
+        return False
+    env = t.get("envelope") or ""
+    save = call["save"][m.group(1)]
+    p = save[len(env) + 1:] if env and save.startswith(env + "/") else save
+    if (t.get("id") or {}).get("from") == p:
+        return None
+    if "/" in p:
+        return False  # a nested field the fake may not answer
+    return ("path", "status.atProvider." + p)
+
+
+def spec_value(r, t):
+    """The target's spec field Upjet's ExtractParamPath("x", false) takes
+    (its own x: Vault's plugin name), as a how, else False."""
+    x = r.get("extractor") or ""
+    m = PARAM_PATH.search(x)
+    if not (m and x.startswith(UPJET) and m.group(2) == "false"):
+        return False
+    fields = list(t.get("sample") or {}) + [p["field"] for p in t.get("params") or []]
+    f = next((f for f in fields if norm(f) == norm(m.group(1))), None)
+    return ("spec", f) if f else False
+
+
 def upjet_refs(v):
-    """{(group, kind): [(field, target kind)]} from the Upjet facts: each
-    reference whose target one of our kinds serves, on a field the kind's
-    sample sets, taking the target's ID (Upjet's default extractor)."""
+    """{(group, kind): [(field, target kind, how)]} from the Upjet facts:
+    each reference whose target one of our kinds serves, on a field of the
+    kind's, and what of the target the field takes. how is None for the
+    target's ID (status.id), or ("same", field) for the value the target's
+    own field holds (a parent they share), ("spec", field) for the target's
+    spec field (an upsert's name, which it has no status.id for), or
+    ("path", fieldPath) for another of its values (live_value).
+
+    The field is the one whose name is the reference's (case and
+    underscores aside), a string in the kind's sample (fieldRefs fills a
+    string, not a reference object or a list), taking the target's ID
+    (Upjet's default extractor, or one that gives the same: takes_id).
+    Where no field has the reference's name
+    (Terraform's repository, our repo), the kind's path says it: where the
+    kind's path runs through the target's item path, the field at the
+    target's ID is the target's ID, and those at the target's other
+    parameters are parents they share (aligned)."""
     out = {}
     for sl in v.upjet:
         for e in sl.get("entries") or []:
@@ -202,40 +365,151 @@ def upjet_refs(v):
                 continue
             sample = {norm(f): f for f in (k.get("sample") or {})}
             for r in e["facts"].get("references") or []:
-                if r.get("extractor") or "." in r["field"]:
-                    continue  # not the target's ID, or a nested field
+                if "." in r["field"]:
+                    continue  # nested
                 f = sample.get(norm(r["field"]))
-                # fieldRefs fills a top-level field with the target's ID: a
-                # string. A reference object ({id, type}) or a list of IDs
-                # is out of its reach.
-                if not f or not isinstance(k["sample"][f], str):
-                    continue
                 for served in (e.get("targetsOurs") or {}).get(r.get("target", "")) or []:
                     g, _, tk = served.partition("/")
                     t = v.kind(tk, g)
-                    if t and t is not k and (f, t) not in out.setdefault((k["group"], k["kind"]), []):
-                        out[(k["group"], k["kind"])].append((f, t))
+                    if not t or t is k:
+                        continue
+                    al = aligned(k, t)
+                    tid = (t.get("id") or {}).get("param") or own_name(t)
+                    if al and (not f or f in al) and tid in al.values():
+                        # The path says which field: the target's ID (or,
+                        # for an upsert, the name its path ends in), and
+                        # the parents they share. The extractor doesn't
+                        # matter: the path holds the ID there.
+                        got = [(kf, ("same", tp) if tp != tid else None if t.get("id") else ("spec", tp))
+                               for kf, tp in al.items()]
+                    elif not f or not isinstance(k["sample"][f], str):
+                        # fieldRefs fills a top-level field with one value.
+                        # A reference object ({id, type}) or a list of IDs
+                        # is out of its reach.
+                        continue
+                    else:
+                        how = live_value(v, k, f, t)
+                        if how is False:
+                            how = None if takes_id(r, t) else spec_value(r, t)
+                        if how is False:
+                            continue  # not the target's ID, or not known to be
+                        # Where the kind's path runs through the target's
+                        # but not to its ID, they still share those parents.
+                        got = [(f, how)] + [(kf, ("same", tp)) for kf, tp in (al or {}).items() if kf != f]
+                    refs = out.setdefault((k["group"], k["kind"]), [])
+                    for kf, how in got:
+                        if (kf, t, how) not in refs:
+                            refs.append((kf, t, how))
     return out
 
 
-def upjet_objects(v, k, refs):
-    """k after the targets of its Upjet references, each from its own spec."""
+def ref_to(v, t, tname, field_path=None):
+    ref = {"kind": t["kind"], "name": tname}
+    if sum(1 for x in v.kinds if x["kind"] == t["kind"]) > 1:
+        ref = {"apiVersion": f"{t['group']}/{t['version']}", **ref}
+    if field_path:
+        ref["fieldPath"] = field_path
+    return ref
+
+
+class Upjet:
+    """What the examples from Upjet references are built from: every
+    kind's references (upjet_refs), the kinds whose examples are skipped,
+    and the kinds a live-test example already shows."""
+    def __init__(self, v, refs=None, skip=(), shown=()):
+        self.v, self.refs, self.skip, self.shown = v, refs if refs is not None else upjet_refs(v), skip, shown
+        self.made, self.making = {}, set()
+
+    def target(self, t):
+        """t as objects, after those it needs: from its own Upjet
+        references too, so that a parent the kind shares with it is the
+        same object (Cloudflare's QueueConsumer and its Queue name the same
+        Account), unless a live test shows t, or t's own example is
+        skipped. The same objects each time it is asked."""
+        key = (t["group"], t["kind"])
+        if key in self.making:
+            # A reference that leads back to a kind being made: its plain
+            # objects, not kept, so that the kind is the same everywhere.
+            return self.v.objects(t, "example-" + t["kind"].lower())
+        if key not in self.made:
+            objs = None
+            if key in self.refs and key not in self.shown and t["kind"] not in self.skip:
+                objs = upjet_objects(self, t, self.refs[key], quiet=True)
+            self.made[key] = objs or self.v.objects(t, "example-" + t["kind"].lower())
+        return self.made[key]
+
+
+def upjet_objects(u, k, refs, quiet=False):
+    """k after the targets of its Upjet references, each from its own spec
+    (Upjet.target), or None where two references give a field different
+    values, or two targets need different objects of one name."""
+    v = u.v if isinstance(u, Upjet) else u
+    u = u if isinstance(u, Upjet) else Upjet(v, refs={})
+    key = (k["group"], k["kind"])
+    if key in u.making:
+        return None
+    u.making.add(key)
+    try:
+        return _upjet_objects(u, v, k, refs, quiet)
+    finally:
+        u.making.discard(key)
+
+
+def _upjet_objects(u, v, k, refs, quiet):
     name = "example-" + k["kind"].lower()
-    out, field_refs = [], {}
+    out, values = [], {}
     spec, _, _ = v.spec_of(k, name, [])
-    for f, t in refs:
-        if f in field_refs:
-            continue  # one target per field
+    for f, t, how in refs:
         tname = "example-" + t["kind"].lower()
-        for o in v.objects(t, tname):
-            if o not in out:
+        tobjs = u.target(t)
+        for o in tobjs:
+            if (o["kind"], o["metadata"]["name"]) == (k["kind"], name):
+                # References that lead back to k: k would be made twice.
+                if not quiet:
+                    print(f"{k['kind']}: no example from Upjet references (its references lead back to it)", file=sys.stderr)
+                return None
+            same = next((x for x in out if (x["kind"], x["metadata"]["name"]) == (o["kind"], o["metadata"]["name"])), None)
+            if same is None:
                 out.append(o)
-        ref = {"kind": t["kind"], "name": tname}
-        if sum(1 for x in v.kinds if x["kind"] == t["kind"]) > 1:
-            ref = {"apiVersion": f"{t['group']}/{t['version']}", **ref}
-        field_refs[f] = ref
-        spec.pop(f, None)
-    spec = fill(spec, name)
+            elif same != o:
+                if not quiet:
+                    print(f"{k['kind']}: no example from Upjet references (two different {o['kind']} {o['metadata']['name']})", file=sys.stderr)
+                return None
+        if how is None:
+            val = ("ref", ref_to(v, t, tname))
+        elif how[0] == "path":
+            val = ("ref", ref_to(v, t, tname, how[1]))
+        else:
+            # A parent they share, or the target's own name: the target's
+            # value, or its reference; its name by reference, so that the
+            # kind is made after it.
+            tspec = tobjs[-1]["spec"]
+            tf = how[1] if how[0] == "spec" else None
+            for p in t.get("params") or []:
+                if p["name"] == how[1]:
+                    tf = p["field"]
+            if tf in (tspec.get("fieldRefs") or {}):
+                val = ("ref", tspec["fieldRefs"][tf])
+            elif tf in tspec and how[0] == "spec":
+                val = ("ref", ref_to(v, t, tname, "spec." + tf))
+            elif tf in tspec:
+                val = ("value", tspec[tf])
+            else:
+                continue
+        if values.setdefault(f, val) != val:
+            if not quiet:
+                print(f"{k['kind']}: no example from Upjet references ({f} would be both {values[f][1]} and {val[1]})", file=sys.stderr)
+            return None
+    for f, (what, _) in values.items():
+        if what == "ref":
+            spec.pop(f, None)
+    spec = fill(spec, name)  # a value taken from a target keeps its place
+    field_refs = {}
+    for f, (what, val) in values.items():
+        if what == "ref":
+            field_refs[f] = val
+        else:
+            spec[f] = val
     spec["fieldRefs"] = field_refs
     out.append({"apiVersion": f"{k['group']}/{k['version']}", "kind": k["kind"],
                 "metadata": {"name": name, "namespace": "default"}, "spec": spec})
@@ -274,15 +548,18 @@ def main():
     sp = os.path.join(repo, "hack", "gen", "examples-skip.yaml")
     skip = ((yaml.safe_load(open(sp)) or {}).get("upjet") or {}) if os.path.exists(sp) else {}
     used = set()
-    for (g, kn), refs in sorted(upjet_refs(v).items()):
+    u = Upjet(v, skip=skip, shown=shown)
+    for (g, kn), refs in sorted(u.refs.items()):
         if (g, kn) in shown:
             continue
         if kn in skip:
             used.add(kn)
             print(f"{kn}: no example from Upjet references ({skip[kn]})", file=sys.stderr)
             continue
-        write(out_dir, v.kind(kn, g), upjet_objects(v, v.kind(kn, g), refs), UPJET_HEAD)
-        nu += 1
+        objs = upjet_objects(u, v.kind(kn, g), refs)
+        if objs and len(objs) > 1:
+            write(out_dir, v.kind(kn, g), objs, UPJET_HEAD)
+            nu += 1
     for d in glob.glob(os.path.join(out_dir, "*")):
         if os.path.isdir(d) and not os.listdir(d):
             os.rmdir(d)
