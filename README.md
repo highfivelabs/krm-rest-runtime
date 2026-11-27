@@ -18,7 +18,7 @@ and this module does the rest.
 
 | Package | What |
 | --- | --- |
-| `gen/krmgen.py` | The generator: a vendor's OpenAPI spec + Terraform's resource list → `types.yaml`, CRDs, report. Keeps only API resources that fill a Terraform gap. |
+| `gen/krmgen.py` | The generator: a vendor's OpenAPI spec + Terraform's resource list → `types.yaml`, CRDs, report. Keeps only API resources that fill a Terraform gap. Also writes `docs/coverage/` (`resources.csv`, `services.csv`, `README.md`): every API resource it finds in the spec, ours where a kind covers it, official where the Terraform type matched to it is in the gaps file's optional `covered` list (the vendor's own operators'), the denominator of the vendor's API coverage in the KRM Registry |
 | `gen/graphqlgen.py` | The generator's hand-written kinds: one file each (`hack/gen/graphql/<name>.yaml`, `hack/gen/kinds/<name>.yaml`: the GraphQL documents or REST calls, how the spec fills them, the fields), for resources a vendor manages only through GraphQL, through GraphQL and REST both, or through REST calls no OpenAPI item pairs. See "GraphQL kinds" and "Hand-written kinds" below |
 | `gen/examples.py` | A vendor's `examples/<Kind>/with-<Parent>.yaml`: each kind its live test gives another resource's ID, shown with that resource as an object of its own kind, joined by `spec.fieldRefs` (from `hack/live/live.yaml`); and, from the repository's Upjet facts (`hack/upjet/*.json`, delivered by the factory), each reference from a kind's string field to a kind served here, unless `hack/gen/examples-skip.yaml` says why it does not hold |
 | `gen/drafts.py` | The generator's draft kinds: a skeleton for every Terraform gap type no kind covers, never reconciled (see "Draft kinds" below) |

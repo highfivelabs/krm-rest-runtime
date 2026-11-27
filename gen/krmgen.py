@@ -1206,10 +1206,11 @@ def build(cfg, base):
     ov = cfg.get("overrides") or {}
     global SKIP_OPS
     SKIP_OPS = tuple(ov.get("excludeOperationIdPrefixes") or ())
-    res = match(find_resources(specs, cfg.get("postUpdates", False), tuple(ov.get("excludePathPrefixes") or ()),
+    found = find_resources(specs, cfg.get("postUpdates", False), tuple(ov.get("excludePathPrefixes") or ()),
                                ov.get("listReads"), ov.get("assocs") or (), ov.get("creates"), ov.get("deletes"),
                                tuple(ov.get("forget") or ()) + tuple(ov.get("deleteBody") or ()), tuple(ov.get("postUpdates") or ()), ov.get("readFrom"),
-                               tuple(ov.get("patchUpserts") or ()), ov.get("updates"), ov.get("keyedBy"), ov.get("createBody")), gaps, prefix,
+                               tuple(ov.get("patchUpserts") or ()), ov.get("updates"), ov.get("keyedBy"), ov.get("createBody"))
+    res = match(found, gaps, prefix,
               # A type a hand-written kind stands in for is that kind's: no
               # spec path is matched to it by its name.
               dict(ov, _handwritten=graphqlgen.claimed_types(cfg, base)))
@@ -2185,6 +2186,7 @@ def build(cfg, base):
     DRAFT_INFO["gaps"] = len(gaps)
     connection = connection_crd(cfg)
     f = {"vendor": vendor, "connection": {"group": f"core.{suffix}", "version": "v1alpha1", "kind": cfg["connectionKind"]}, "kinds": kinds}
+    coverage(cfg, base, ov, prefix, found, [k for k in f["kinds"] if k.get("readiness") != "draft"])
     return f, crds, connection
 
 
@@ -2649,6 +2651,94 @@ def sql_kinds(cfg, base, gaps, prefix, kinds, crds, live):
 
 TF_DOCS = {}     # always empty: Terraform's prose is MPL-2.0 and never copied (kept for graphqlgen's context)
 DRAFT_INFO = {}  # vendor.yaml hardBlocks and draftNotes, and the gap count, for the report
+COVERAGE = []    # one row per API resource the spec has, for docs/coverage (coverage())
+NOT_A_SERVICE = re.compile(r"^(api|rest|public|v\d+([a-z]+\d*)?)$")
+
+
+def api_service(item):
+    """The first literal segment of an item's path that is not a version or an API prefix."""
+    segs = [x for x in item.split("/") if x and not x.startswith("{") and not NOT_A_SERVICE.match(x)]
+    return segs[0] if segs else "/"
+
+
+def coverage(cfg, base, ov, prefix, found, kinds):
+    """Every resource the generator finds in the spec (find_resources, with vendor.yaml's own
+    exclusions): the denominator of the vendor's API coverage. A resource is ours when a kind
+    of ours calls its path or stands in for the Terraform type matched to it; official when the
+    Terraform type matched to it is one the vendor's own operators cover (the gaps file's
+    optional `covered` list), matched by the same rule as the gaps."""
+    import copy
+    covered = json.load(open(os.path.join(base, cfg["terraform"]["gaps"])))[cfg["terraform"]["provider"]].get("covered") or []
+    official = {}
+    if covered:
+        for r in match(copy.deepcopy(found), covered, prefix, dict(ov, map={}, _handwritten=())):
+            official[r["item"]] = r["tf"]
+    paths, tf_kind = {}, {}
+    for k in kinds:
+        for c in ("create", "read", "update", "delete"):
+            if (k.get(c) or {}).get("path"):
+                paths.setdefault(norm(k[c]["path"]), set()).add(k["kind"])
+        for t in k.get("terraform") or ():
+            tf_kind.setdefault(t, set()).add(k["kind"])
+    COVERAGE.clear()
+    for r in sorted(found, key=lambda r: r["item"]):
+        ours = set(paths.get(norm(r["item"]), ())) | {n for t in r.get("tf") or () for n in tf_kind.get(t, ())}
+        COVERAGE.append({"service": api_service(r["item"]), "resource": r["item"], "shape": r["shape"],
+                         "terraform": ";".join(sorted(r.get("tf") or ())),
+                         "official_terraform": ";".join(sorted(official.get(r["item"], ()))),
+                         "ours_kinds": ";".join(sorted(ours))})
+
+
+def write_coverage(out, cfg, base):
+    """docs/coverage: resources.csv, services.csv (the cloud repositories' columns, resources
+    only) and a README saying what is counted."""
+    import csv
+    d = os.path.join(out, "docs", "coverage")
+    os.makedirs(d, exist_ok=True)
+    cols = ["service", "resource", "shape", "terraform", "official_terraform", "ours_kinds"]
+    with open(os.path.join(d, "resources.csv"), "w", newline="") as fh:
+        w = csv.DictWriter(fh, cols, lineterminator="\n")
+        w.writeheader()
+        w.writerows(COVERAGE)
+    by = {}
+    for r in COVERAGE:
+        s = by.setdefault(r["service"], [0, 0, 0])
+        s[0] += 1
+        s[1] += bool(r["official_terraform"])
+        s[2] += bool(r["ours_kinds"]) and not r["official_terraform"]
+    with open(os.path.join(d, "services.csv"), "w", newline="") as fh:
+        w = csv.writer(fh, lineterminator="\n")
+        w.writerow(["service", "resources_total", "resources_official", "resources_ours_beyond", "pct_covered"])
+        for svc in sorted(by):
+            t, o, b = by[svc]
+            w.writerow([svc, t, o, b, f"{100 * (o + b) / t:.1f}"])
+    t = len(COVERAGE)
+    o = sum(1 for r in COVERAGE if r["official_terraform"])
+    b = sum(1 for r in COVERAGE if r["ours_kinds"] and not r["official_terraform"])
+    ex = (cfg.get("overrides") or {}).get("excludePathPrefixes") or []
+    has_cov = bool(json.load(open(os.path.join(base, cfg["terraform"]["gaps"])))
+                   [cfg["terraform"]["provider"]].get("covered"))
+    lines = [f"# Coverage of the {cfg['title']} API", "",
+             "Code generated by krm-rest-runtime/gen/krmgen.py. DO NOT EDIT.", "",
+             f"**{o + b} of {t}** API resources have a kind ({100 * (o + b) // max(t, 1)}%): "
+             f"{o} by {cfg['title']}'s own operators, {b} more by this repository's kinds.", "",
+             "## What is counted", "",
+             "An **API resource** is what the generator finds in the vendor's OpenAPI spec "
+             "(`hack/gen/vendor.yaml` `specs`): a path you can create and read (`crud`), a path written in "
+             "place and read back (`upsert`), or a settings path you read and write (`settings`). "
+             "The spec's paths are read as published; resources that only a GraphQL API or SQL reaches, "
+             "or that the spec does not describe, are not counted."
+             + (" Paths under vendor.yaml's `excludePathPrefixes` are left out too: " + ", ".join(f"`{p}`" for p in ex) + "." if ex else ""), "",
+             "- **ours**: a kind of this repository calls the resource's path, or stands in for the Terraform type matched to it.",
+             "- **official**: the Terraform type matched to the resource is one the vendor's own operators cover "
+             + ("(the gaps file's `covered` list), matched by the same rule as the gaps." if has_cov else
+                "(the gaps file's `covered` list). This repository's gaps file has none, so nothing counts as official here."),
+             "- **ours beyond official**: ours, and not official.", "",
+             "| File | Row | Columns |", "| --- | --- | --- |",
+             "| `resources.csv` | API resource | `service` (the path's first segment that is not a version), `resource` (its item path), `shape`, "
+             "`terraform` (the Terraform gap types matched to it), `official_terraform`, `ours_kinds` |",
+             "| `services.csv` | service | `resources_total`, `resources_official`, `resources_ours_beyond`, `pct_covered` |"]
+    open(os.path.join(d, "README.md"), "w").write("\n".join(lines) + "\n")
 DESC_STATS = {}  # spec fields described, and from where, for the report
 OUR_FIELDS = {"connectionRef", "secretRefs", "fieldRefs", "replaceOnChange"}
 # Not "encoded": Terraform's json_data_encoded is a string, the API's jsonData an object.
@@ -2964,6 +3054,7 @@ def main():
         lines += [f"| `{t}` | {md_cell(why)} |" for t, why in sorted(hard.items())]
     open(os.path.join(out, "zz_generated.report.md"), "w").write("\n".join(lines) + "\n")
     write_readme(out, cfg, f)
+    write_coverage(out, cfg, os.path.dirname(os.path.abspath(cfg_path)))
     print(f"{cfg['vendor']}: {len(kinds)} kinds, {len(tf_cov)} Terraform gap resources"
           + (f", {len(drafts_)} draft{'s' if len(drafts_) > 1 else ''}" if drafts_ else ""), file=sys.stderr)
 

@@ -46,6 +46,7 @@ step "go vet -tags live ./..." go vet -tags live ./...
 step "go test ./..." go test -count=1 ./...
 step "go test -tags live ./kindtest/" go test -count=1 -tags live ./kindtest/
 step "python3 gen/examples_test.py" python3 gen/examples_test.py
+step "python3 gen/coverage_test.py" python3 gen/coverage_test.py
 
 if $report; then
   sha=$(git rev-parse HEAD)
