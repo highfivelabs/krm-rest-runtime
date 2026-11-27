@@ -93,16 +93,23 @@ A new secret also needs the runner's read access
 
 ## 5. Run it
 
-In sentry-krm-extensions, on an offload VM, at a commit an operator has
-approved:
+On a sentry-krm-extensions pull request, a maintainer comments, as the
+comment's first line:
 
-```sh
-KRM_LIVE=1 KRM_LIVE_APPROVE=<that commit> go test -tags live -run TestEveryKindLive -v .
+```text
+/ok-to-test-live sha=<the full head SHA> [kinds=A,B]
 ```
 
-`KRM_LIVE_APPROVE` is the provenance gate: HEAD's full commit, which the
-operator read and named; without it the run is refused before any
-credential is read ([../live.md](../live.md)).
+The run (`.github/workflows/hfl-live.yml`, from krm-ci) starts only if
+`hfl/security-review` passed on that SHA and the `live` environment's
+reviewers approve it. `kinds=` limits it to those kinds.
+
+Run locally instead, on an offload VM, as [../live.md](../live.md)
+("Running") describes:
+
+```sh
+KRM_LIVE=1 go test -tags live -run TestEveryKindLive -v .
+```
 
 ## 6. If the first setup call answers 403
 
