@@ -16,7 +16,7 @@ payment details, MFA, and pasting the token into a terminal.
 | Snowflake | [snowflake.md](snowflake.md) | `krm-live-snowflake` | `token`, `baseURL`, `tokenType` | On Demand after the trial ([billing.md](billing.md)) |
 | Cloudflare | [cloudflare-zero-trust.md](cloudflare-zero-trust.md) | `krm-live-cloudflare` | `apiToken`, `accountId`, `zoneId`, `zoneName`, `teamName` | Free plan and Zero Trust Free (card on file, $0); a zone of your own (its domain is `zoneName`) |
 | Datadog | none (made by the builder) | `krm-live-datadog` | `apiKey`, `appKey`, `site` | the Free plan after the 14-day trial |
-| Sentry | [sentry.md](sentry.md) | `krm-live-sentry` | `token`, `org` | a free org of its own (Developer plan) |
+| Sentry | [sentry.md](sentry.md) | `krm-live-sentry` | `token`, `org` (`baseURL` for the EU) | a dedicated test organization (Developer plan, free) |
 | Confluent | none (made by the builder) | `krm-live-confluent` | see the vendor's live.yaml | pay as you go after the trial credits ([billing.md](billing.md)) |
 | Grafana Cloud | [grafana-cloud.md](grafana-cloud.md) | `krm-live-grafana-cloud` | `token`, `baseURL`, `rootURL` | Grafana Cloud Free |
 | HCP Vault | [billing.md](billing.md) | `krm-live-hcp` | `clientId`, `clientSecret`, `projectId` | pay as you go, a Development cluster per run |
@@ -117,9 +117,9 @@ account but all others were created afresh". The secrets
 these three have no sign-up guide. Linear: HFL-609 (Datadog), HFL-610
 (Cloudflare), HFL-640 (Sentry); wind-down HFL-642 and its children.
 
-**Sentry is the company's real account, not a test one.** Its live tests
-must only ever touch objects named `hfl-live-...`: the run's own objects
-and the sweep's deletions (`sentry-krm-extensions/hack/live/live.yaml`,
-`sweep:` lists teams, projects and monitors by slug and deletes only the
-`hfl-live-` ones). Never run the sweep with a broader prefix there, and
-never name anything by hand `hfl-live-...` in that org.
+**Sentry now has a dedicated test organization** (builder, 2026-11-27):
+an organization with nothing else in it, and an internal integration
+token scoped to it. [sentry.md](sentry.md) sets it up. The earlier rule
+that Sentry's live tests run in the company's organization and touch only
+`hfl-live-` names no longer applies; the sweep keeps its `hfl-live-`
+prefix as cleanup hygiene.
