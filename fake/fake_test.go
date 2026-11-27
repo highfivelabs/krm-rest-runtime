@@ -381,3 +381,69 @@ func TestSharedListEmpty(t *testing.T) {
 		t.Fatalf("empty shared list: %d %v %v, want 200 []", resp.StatusCode, got, err)
 	}
 }
+
+// A mixed kind (made by GraphQL, read and changed by REST) shares its item
+// path with a settings kind that writes its own path (GitHub's
+// EnterpriseOrganization and OrganizationSettings on /orgs/{id}): once the
+// mixed kind's object exists, a write to the path is that object's, not a
+// second object kept under the path.
+func TestMixedKindOwnsItsPath(t *testing.T) {
+	f, err := descriptor.Parse([]byte(`vendor: example
+connection: {group: core.example.hfl.dev, version: v1alpha1, kind: Connection}
+kinds:
+- kind: Org
+  group: o.example.hfl.dev
+  version: v1alpha1
+  plural: orgs
+  shape: crud
+  create:
+    method: POST
+    path: /graphql
+    graphql:
+      operation: CreateOrg
+      query: "mutation CreateOrg($input: CreateOrgInput!) { createOrg(input: $input) { org { login } } }"
+      result: createOrg/org
+      variables: {input: {login: "{login}"}}
+  read: {method: GET, path: "/orgs/{id}"}
+  update: {method: PATCH, path: "/orgs/{id}"}
+  delete: {method: DELETE, path: "/orgs/{id}"}
+  id: {param: id, from: login}
+  sample: {login: o1}
+- kind: OrgSettings
+  group: o.example.hfl.dev
+  version: v1alpha1
+  plural: orgsettingses
+  shape: settings
+  read: {method: GET, path: "/orgs/{id}"}
+  update: {method: PATCH, path: "/orgs/{id}"}
+  params: [{name: id, field: org}]
+  sample: {org: o2, description: d}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	api := New(f)
+	srv := httptest.NewServer(api)
+	defer srv.Close()
+	q := `{"operationName":"CreateOrg","query":"mutation CreateOrg($input: CreateOrgInput!) { createOrg(input: $input) { org { login } } }","variables":{"input":{"login":"o1"}}}`
+	resp, err := http.Post(srv.URL+"/graphql", "application/json", strings.NewReader(q))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if api.Len() != 1 {
+		t.Fatalf("after the create: %d objects, want 1: %v", api.Len(), api.Paths())
+	}
+	req, _ := http.NewRequest(http.MethodPatch, srv.URL+"/orgs/o1", strings.NewReader(`{"description":"changed"}`))
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("PATCH /orgs/o1: %d", resp.StatusCode)
+	}
+	if api.Len() != 1 {
+		t.Errorf("after the PATCH: %d objects, want the org alone: %v", api.Len(), api.Paths())
+	}
+}
