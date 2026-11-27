@@ -172,6 +172,90 @@ class Extractors(unittest.TestCase):
         self.assertEqual(rule["spec"]["ownerId"], "y")
 
 
+# Values other than status.id: an upsert's name, and a value the live test
+# reads from the target (GitHub's node_id, which GraphQL kinds take).
+VALUE_TYPES = {"vendor": "x", "kinds": [
+    {"kind": "Repository", "group": "repo.x.hfl.dev", "version": "v1alpha1", "shape": "crud",
+     "create": {"method": "POST", "path": "/orgs/{owner}/repos"}, "read": {"method": "GET", "path": "/repos/{owner}/{id}"},
+     "params": [{"name": "owner", "field": "owner"}], "id": {"param": "id", "from": "name"},
+     "sample": {"owner": "the-org", "name": "example-repo"}, "serverFields": {"node_id": "R_x"}},
+    {"kind": "Protection", "group": "repo.x.hfl.dev", "version": "v1alpha1", "shape": "crud",
+     "create": {"method": "POST", "path": "/graphql", "graphql": {"operation": "C"}},
+     "read": {"method": "POST", "path": "/graphql", "graphql": {"operation": "R"}},
+     "id": {"param": "id", "from": "id"}, "sample": {"repositoryId": "R_example", "pattern": "main"}},
+    {"kind": "OrgSecret", "group": "org.x.hfl.dev", "version": "v1alpha1", "shape": "upsert",
+     "read": {"method": "GET", "path": "/orgs/{org}/secrets/{secret_name}"},
+     "params": [{"name": "org", "field": "org"}, {"name": "secret_name", "field": "secretName"}],
+     "sample": {"org": "the-org", "secretName": "S"}},
+    {"kind": "OrgSecretRepo", "group": "org.x.hfl.dev", "version": "v1alpha1", "shape": "upsert",
+     "read": {"method": "GET", "path": "/orgs/{org}/secrets/{secret_name}/repositories/{repository_id}"},
+     "params": [{"name": "org", "field": "org"}, {"name": "secret_name", "field": "secretName"}, {"name": "repository_id", "field": "repositoryID"}],
+     "sample": {"org": "example-org", "secretName": "example-secret-name", "repositoryID": "1"}},
+    {"kind": "Plugin", "group": "sys.x.hfl.dev", "version": "v1alpha1", "shape": "upsert",
+     "read": {"method": "GET", "path": "/sys/plugins/catalog/{type}/{name}"},
+     "params": [{"name": "type", "field": "type"}, {"name": "name", "field": "name"}], "sample": {"type": "secret", "name": "p"}},
+    {"kind": "Pin", "group": "sys.x.hfl.dev", "version": "v1alpha1", "shape": "upsert",
+     "read": {"method": "GET", "path": "/sys/plugins/pins/{type}/{name}"},
+     "params": [{"name": "type", "field": "type"}, {"name": "name", "field": "name"}], "sample": {"type": "x", "name": "y"}},
+]}
+VALUE_SLICE = {"entries": [
+    {"ours": {"kind": "Protection", "group": "repo.x.hfl.dev"},
+     "facts": {"references": [{"field": "repository_id", "target": "x_repository"}]},
+     "targetsOurs": {"x_repository": ["repo.x.hfl.dev/Repository"]}},
+    {"ours": {"kind": "OrgSecretRepo", "group": "org.x.hfl.dev"},
+     "facts": {"references": [{"field": "secret_name", "target": "x_org_secret"}]},
+     "targetsOurs": {"x_org_secret": ["org.x.hfl.dev/OrgSecret"]}},
+    {"ours": {"kind": "Pin", "group": "sys.x.hfl.dev"},
+     "facts": {"references": [
+         {"field": "name", "target": "x_plugin", "extractor": 'github.com/crossplane/upjet/v2/pkg/resource.ExtractParamPath("name",false)'},
+         {"field": "type", "target": "x_plugin", "extractor": 'github.com/crossplane/upjet/v2/pkg/resource.ExtractParamPath("type",true)'},
+     ]},
+     "targetsOurs": {"x_plugin": ["sys.x.hfl.dev/Plugin"]}},
+]}
+VALUE_LIVE = {
+    "before": [{"method": "POST", "path": "/orgs/{{cred:org}}/repos", "body": {"name": "{{run}}"}}],
+    "kinds": [{"kind": "Protection", "replaceSample": True,
+               "before": [{"method": "GET", "path": "/repos/{{cred:org}}/{{run}}", "save": {"repoNode": "node_id"}}],
+               "spec": {"repositoryId": "{{var:repoNode}}", "pattern": "{{name}}/*"}}],
+}
+
+
+class Values(unittest.TestCase):
+    def repo(self, live=True):
+        d = write_repo(VALUE_TYPES, VALUE_SLICE)
+        if live:
+            os.makedirs(os.path.join(d, "hack", "live"))
+            yaml.safe_dump(VALUE_LIVE, open(os.path.join(d, "hack", "live", "live.yaml"), "w"))
+        return d
+
+    def refs(self, d, kind):
+        refs = examples.upjet_refs(examples.Vendor(d))
+        return [(f, t["kind"], how) for (g, k), rs in refs.items() if k == kind for f, t, how in rs]
+
+    def test_upsert_name(self):
+        d = self.repo()
+        self.assertEqual(self.refs(d, "OrgSecretRepo"), [("org", "OrgSecret", ("same", "org")), ("secretName", "OrgSecret", ("spec", "secret_name"))])
+        generate(d)
+        _, sr = list(yaml.safe_load_all(open(os.path.join(d, "examples", "OrgSecretRepo", "with-OrgSecret.yaml"))))
+        self.assertEqual(sr["spec"]["org"], "the-org")
+        self.assertEqual(sr["spec"]["fieldRefs"], {"secretName": {"kind": "OrgSecret", "name": "example-orgsecret", "fieldPath": "spec.secretName"}})
+
+    def test_param_path_spec(self):
+        # name: the plugin's spec.name. type: ExtractParamPath(..., true)
+        # is the plugin's status, which an upsert's isn't known to hold.
+        self.assertEqual(self.refs(self.repo(), "Pin"), [("name", "Plugin", ("spec", "name"))])
+
+    def test_live_value(self):
+        d = self.repo()
+        self.assertEqual(self.refs(d, "Protection"), [("repositoryId", "Repository", ("path", "status.atProvider.node_id"))])
+        generate(d)
+        _, pr = list(yaml.safe_load_all(open(os.path.join(d, "examples", "Protection", "with-Repository.yaml"))))
+        self.assertEqual(pr["spec"]["fieldRefs"], {"repositoryId": {"kind": "Repository", "name": "example-repository",
+                                                                    "fieldPath": "status.atProvider.node_id"}})
+        # Without the live test, Upjet's default is status.id: the name.
+        self.assertEqual(self.refs(self.repo(live=False), "Protection"), [("repositoryId", "Repository", None)])
+
+
 class ByPath(unittest.TestCase):
     def test_refs(self):
         refs = examples.upjet_refs(examples.Vendor(write_repo(PATH_TYPES, PATH_SLICE)))
