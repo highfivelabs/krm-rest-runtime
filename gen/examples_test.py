@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 """Tests for examples.py's examples from Upjet references (python3 gen/examples_test.py)."""
-import json, os, subprocess, sys, tempfile, unittest
+import glob, json, os, subprocess, sys, tempfile, unittest
 
 import yaml
 
@@ -300,6 +300,37 @@ class SharedParents(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertIn("Consumer: no example from Upjet references (accountID would be both", p.stderr)
         self.assertFalse(os.path.exists(os.path.join(d, "examples", "Consumer")))
+
+
+# Two kinds whose Upjet references point at each other.
+CYCLE_TYPES = {"vendor": "x", "kinds": [
+    {"kind": "Group", "group": "g.x.hfl.dev", "version": "v1alpha1", "shape": "crud", "id": {"param": "id", "from": "id"},
+     "sample": {"name": "g", "ruleID": "example-ruleID"}},
+    {"kind": "Rule", "group": "g.x.hfl.dev", "version": "v1alpha1", "shape": "crud", "id": {"param": "id", "from": "id"},
+     "sample": {"name": "r", "groupID": "example-groupID"}},
+]}
+CYCLE_SLICE = {"entries": [
+    {"ours": {"kind": "Group", "group": "g.x.hfl.dev"},
+     "facts": {"references": [{"field": "rule_id", "target": "x_rule"}]}, "targetsOurs": {"x_rule": ["g.x.hfl.dev/Rule"]}},
+    {"ours": {"kind": "Rule", "group": "g.x.hfl.dev"},
+     "facts": {"references": [{"field": "group_id", "target": "x_group"}]}, "targetsOurs": {"x_group": ["g.x.hfl.dev/Group"]}},
+]}
+
+
+class Cycle(unittest.TestCase):
+    def test_no_kind_twice(self):
+        # Each kind's references lead back to it: no example would make it
+        # once, so neither has one.
+        d = write_repo(CYCLE_TYPES, CYCLE_SLICE)
+        p = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), "examples.py"), d], capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("Group: no example from Upjet references (its references lead back to it)", p.stderr)
+        self.assertIn("Rule: no example from Upjet references (its references lead back to it)", p.stderr)
+        for kn in ("Group", "Rule"):
+            for f in glob.glob(os.path.join(d, "examples", kn, "*.yaml")):
+                objs = list(yaml.safe_load_all(open(f)))
+                names = [(o["kind"], o["metadata"]["name"]) for o in objs]
+                self.assertEqual(len(names), len(set(names)), f)
 
 
 class ByPath(unittest.TestCase):

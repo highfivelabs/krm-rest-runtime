@@ -427,12 +427,14 @@ class Upjet:
         Account), unless a live test shows t, or t's own example is
         skipped. The same objects each time it is asked."""
         key = (t["group"], t["kind"])
+        if key in self.making:
+            # A reference that leads back to a kind being made: its plain
+            # objects, not kept, so that the kind is the same everywhere.
+            return self.v.objects(t, "example-" + t["kind"].lower())
         if key not in self.made:
             objs = None
-            if key in self.refs and key not in self.shown and t["kind"] not in self.skip and key not in self.making:
-                self.making.add(key)
+            if key in self.refs and key not in self.shown and t["kind"] not in self.skip:
                 objs = upjet_objects(self, t, self.refs[key], quiet=True)
-                self.making.discard(key)
             self.made[key] = objs or self.v.objects(t, "example-" + t["kind"].lower())
         return self.made[key]
 
@@ -443,6 +445,17 @@ def upjet_objects(u, k, refs, quiet=False):
     values, or two targets need different objects of one name."""
     v = u.v if isinstance(u, Upjet) else u
     u = u if isinstance(u, Upjet) else Upjet(v, refs={})
+    key = (k["group"], k["kind"])
+    if key in u.making:
+        return None
+    u.making.add(key)
+    try:
+        return _upjet_objects(u, v, k, refs, quiet)
+    finally:
+        u.making.discard(key)
+
+
+def _upjet_objects(u, v, k, refs, quiet):
     name = "example-" + k["kind"].lower()
     out, values = [], {}
     spec, _, _ = v.spec_of(k, name, [])
@@ -450,6 +463,11 @@ def upjet_objects(u, k, refs, quiet=False):
         tname = "example-" + t["kind"].lower()
         tobjs = u.target(t)
         for o in tobjs:
+            if (o["kind"], o["metadata"]["name"]) == (k["kind"], name):
+                # References that lead back to k: k would be made twice.
+                if not quiet:
+                    print(f"{k['kind']}: no example from Upjet references (its references lead back to it)", file=sys.stderr)
+                return None
             same = next((x for x in out if (x["kind"], x["metadata"]["name"]) == (o["kind"], o["metadata"]["name"])), None)
             if same is None:
                 out.append(o)
