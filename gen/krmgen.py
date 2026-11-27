@@ -846,8 +846,11 @@ MAX_SERVER_FIELDS = 100
 
 def server_fields(sp, rprops, bprops, desc):
     """The read response's top-level fields no request body has, each with a
-    sample value; the ID and path fields are the fake's own."""
-    skip = {"id", (desc.get("id") or {}).get("from")} | {p["field"] for p in desc.get("params") or []}
+    sample value; the ID and path fields are the fake's own. A response's
+    "id" is the fake's own only when it is the ID: one named by another
+    field (GitHub's team, by its slug) keeps its numeric id as a server
+    field, as other kinds' references read it."""
+    skip = {(desc.get("id") or {}).get("from") or "id"} | {p["field"] for p in desc.get("params") or []}
     out = {}
     for f in sorted(rprops):
         if f in bprops or f in skip or len(out) >= MAX_SERVER_FIELDS:

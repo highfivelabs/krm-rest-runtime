@@ -4,6 +4,7 @@ package reconciler
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -120,5 +121,64 @@ func TestSetKeyURL(t *testing.T) {
 	}
 	if got := strings.Join(calls, "\n"); got != "DELETE /api/v1/users/u1/linkedObjects/manager\nDELETE /api/v1/users/u2/linkedObjects/manager" {
 		t.Fatalf("delete: %v", calls)
+	}
+}
+
+// A set whose list names each element but leaves a field out (GitHub's team
+// members, listed by login without the role each one's membership holds):
+// Set.ReadEach reads each element and its fields join the list's, so a
+// role that differs is changed and one that matches is left.
+func TestSetReadEachMergesListedElements(t *testing.T) {
+	k := &descriptor.Kind{
+		Kind: "TeamMembers", Group: "team.example.hfl.dev", Version: "v1alpha1", Plural: "teammemberses",
+		Shape: descriptor.SetShape,
+		Set: &descriptor.Set{Field: "members", Key: "login", Param: "username",
+			ReadEach: &descriptor.Op{Method: "GET", Path: "/teams/{team}/memberships/{username}"}},
+		Read:   descriptor.Op{Method: "GET", Path: "/teams/{team}/members"},
+		Create: &descriptor.Op{Method: "PUT", Path: "/teams/{team}/memberships/{username}"},
+		Update: &descriptor.Op{Method: "PUT", Path: "/teams/{team}/memberships/{username}"},
+		Delete: &descriptor.Op{Method: "DELETE", Path: "/teams/{team}/memberships/{username}"},
+		Params: []descriptor.Param{{Name: "team", Field: "team"}},
+	}
+	if err := parseKind(t, k); err != nil {
+		t.Fatal(err)
+	}
+	role := "maintainer"
+	var calls []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		calls = append(calls, req.Method+" "+req.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case req.Method == "GET" && req.URL.Path == "/teams/t1/members":
+			_, _ = w.Write([]byte(`[{"login":"octocat","id":1}]`))
+		case req.Method == "GET" && req.URL.Path == "/teams/t1/memberships/octocat":
+			_, _ = w.Write([]byte(`{"role":"` + role + `","state":"active"}`))
+		case req.Method == "PUT" && req.URL.Path == "/teams/t1/memberships/octocat":
+			var b map[string]any
+			_ = json.NewDecoder(req.Body).Decode(&b)
+			role, _ = b["role"].(string)
+			_, _ = w.Write([]byte(`{"role":"` + role + `","state":"active"}`))
+		default:
+			http.Error(w, `{"message":"Not Found"}`, http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+	r, _, req := newTestReconciler(t, k, srv.URL, map[string]any{"team": "t1",
+		"members": []any{map[string]any{"login": "octocat", "role": "member"}}})
+	ctx := context.Background()
+	if _, err := r.Reconcile(ctx, req); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(calls, "\n"); !strings.Contains(got, "PUT /teams/t1/memberships/octocat") || role != "member" {
+		t.Fatalf("the listed member's role, read by its membership, was not changed: %v (role %s)", calls, role)
+	}
+	calls = nil
+	if _, err := r.Reconcile(ctx, req); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range calls {
+		if strings.HasPrefix(c, "PUT ") {
+			t.Fatalf("resync with the role matching: %v", calls)
+		}
 	}
 }

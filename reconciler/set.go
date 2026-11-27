@@ -113,7 +113,25 @@ func listSet(ctx context.Context, api *rest.Client, k *descriptor.Kind, params m
 				continue
 			}
 			if m, ok := e.(map[string]any); ok && m[k.Set.Key] != nil {
-				out[descriptor.Text(m[k.Set.Key])] = m
+				key := descriptor.Text(m[k.Set.Key])
+				if op := k.Set.ReadEach; op != nil {
+					// The list names each element but leaves fields out
+					// (GitHub's team members, by login, without the role
+					// each one's membership holds): read each, and keep
+					// both.
+					got, err := readElement(ctx, api, k, op, params, key)
+					if errors.Is(err, rest.ErrNotFound) {
+						continue
+					}
+					if err != nil {
+						return nil, first, err
+					}
+					for f, v := range got {
+						m[f] = v
+					}
+					m[k.Set.Key] = key
+				}
+				out[key] = m
 				continue
 			}
 			if e == nil {

@@ -566,7 +566,10 @@ parameters.
 
 Where the list holds only the elements' keys (Vault's LIST,
 `{"data": {"keys": [...]}}`), `set.readEach` reads each element by its
-key. `set.holder` is the resource the elements are in, which the kind
+key. Where it holds objects that name each element but leave fields out
+(GitHub's team members, listed by login without the role each one's
+membership holds), `set.readEach` reads each one too, and its answer's
+fields join the list element's. `set.holder` is the resource the elements are in, which the kind
 makes first, if a read of it finds none, from the spec's `holder.fields`
 and its create's `body`, and deletes, with the elements, when the object
 is deleted (Terraform's `vault_database_secrets_mount`: `POST
