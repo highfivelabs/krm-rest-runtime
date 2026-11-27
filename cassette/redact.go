@@ -322,6 +322,13 @@ func redactValue(v any, keep *keeper) bool {
 	changed := false
 	leaf := func(key, s string, under bool, parent string, person bool) (string, bool) {
 		if (person || personObjects[normName(parent)]) && (personFields[normName(key)] || strings.HasSuffix(normName(key), "url")) && s != "" && !placeholderRE.MatchString(s) {
+			if keep.keeps(s) {
+				// A person's login that is also a path's ID (GitHub's
+				// team memberships, /memberships/<login>): {{id:N}} here as
+				// there, so a replay that reads it sends the same stand-in.
+				keep.note(s)
+				return s, false
+			}
 			return Redacted, true
 		}
 		if (under || secretName(key)) && looksSecret(key, s) || shaped(s) && !strings.Contains(s, " ") {
@@ -359,7 +366,7 @@ func redactValue(v any, keep *keeper) bool {
 			var names []string
 			if person {
 				for _, k := range []string{"login", "handle", "username", "slug"} {
-					if n, ok := x[k].(string); ok && len(n) >= minScrub && !placeholderRE.MatchString(n) {
+					if n, ok := x[k].(string); ok && len(n) >= minScrub && !placeholderRE.MatchString(n) && !keep.keeps(n) {
 						names = append(names, n)
 					}
 				}

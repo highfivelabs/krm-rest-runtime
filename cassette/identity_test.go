@@ -159,3 +159,28 @@ func TestNoIdentitiesChangesNothing(t *testing.T) {
 		t.Errorf("changed: %+v / %+v", a, b)
 	}
 }
+
+// A login in a person object (GitHub's team member list) that is also a
+// path's ID is {{id:N}} there too, not {{redacted}}: a replay that reads
+// the member and asks for its membership by login then sends the same
+// stand-in the recording's path holds. The person's other strings (its
+// URLs) are still redacted.
+func TestPersonLoginThatIsAnID(t *testing.T) {
+	const login = "jane-plainname"
+	k := NewKnown()
+	k.Identify(Identities{RedactVars: []string{"me"}})
+	c := (&Cassette{Vars: map[string]any{"me": login}, Interactions: []Interaction{
+		{Method: "GET", Path: "/orgs/o/teams/t/members", Status: 200,
+			Response: `[{"login":"` + login + `","id":1,"type":"User","site_admin":false,"html_url":"https://github.com/` + login + `"}]`},
+		{Method: "GET", Path: "/orgs/o/teams/t/memberships/" + login, Status: 200, Response: `{"role":"maintainer","state":"active"}`},
+	}}).ScrubbedWith(NewScrubber(), nil, k)
+	if all := cassetteText(c); strings.Contains(all, login) {
+		t.Fatalf("the login is left:\n%s", all)
+	}
+	if r := c.Interactions[0].Response; !strings.Contains(r, `"login":"{{id:1}}"`) {
+		t.Errorf("the member's login is not the path's ID: %s", r)
+	}
+	if c.Interactions[1].Path != "/orgs/o/teams/t/memberships/{{id:1}}" {
+		t.Errorf("path %s", c.Interactions[1].Path)
+	}
+}
