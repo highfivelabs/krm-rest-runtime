@@ -962,6 +962,17 @@ func (s *Server) pick(rs []*route, path string) *route {
 			}
 		}
 	}
+	for _, r := range rs {
+		// A mixed kind's object is kept under its GraphQL key, not its
+		// REST path: the path is still its own (GitHub's
+		// EnterpriseOrganization, made by GraphQL and changed by PATCH
+		// /orgs/{id}, where OrganizationSettings reads and writes too).
+		if r.kind.IsMixed() {
+			if _, ok := s.store[GraphQLKey(r.kind, routeParams(r.re, r.path, path))]; ok {
+				return r
+			}
+		}
+	}
 	if _, stored := s.store[path]; !stored {
 		for _, r := range rs {
 			// A kind read on another kind's path and kept where it is
