@@ -39,6 +39,11 @@ it is: where the kind's own path runs through the target's item path
 and the fields at its other parameters take the target's own values (the
 owner they share).
 
+An extractor other than Upjet's default counts where it gives the same
+ID: Upjet's ExtractResourceID(), its ExtractParamPath on the field our ID
+is from, or a provider's <Kind>ID() in the target's own API package
+(Okta's GroupID()) where our ID is the API's id.
+
 Not every such reference is our status.id (Upjet's default extractor is
 the target's external name, which for some kinds is its name). One that
 does not hold on the fake is listed, with why, in
@@ -238,6 +243,37 @@ def aligned(k, t):
     return None
 
 
+UPJET = "github.com/crossplane/upjet/"
+PARAM_PATH = re.compile(r'\.ExtractParamPath\("([^"]+)",\s*(true|false)\)$')
+KIND_ID = re.compile(r'/apis/([a-z0-9]+)/v[0-9a-z]+\.([A-Za-z0-9]+)ID\(\)$')
+
+
+def takes_id(r, t):
+    """Whether the reference's extractor gives the target's ID, our
+    status.id. Upjet's default and its ExtractResourceID() give the
+    external name; ExtractParamPath("x", ...) the target's x, the ID where
+    x is the field our ID is from (GitHub's team slug); a provider's own
+    <Kind>ID() in the target's API package (Okta's GroupID(), in
+    apis/group), its kind's ID, ours where our ID is the API's id. Any
+    other extractor is code we can't see: no."""
+    x = r.get("extractor")
+    tid = t.get("id") or {}
+    if not tid:
+        return False  # no status.id
+    if not x or (x.startswith(UPJET) and x.endswith("/resource.ExtractResourceID()")):
+        return True
+    m = PARAM_PATH.search(x)
+    if m and x.startswith(UPJET):
+        return norm(m.group(1)) == norm(tid.get("from", "").split("/")[-1])
+    m = KIND_ID.search(x)
+    if m:
+        tg, _, tk = (r.get("targetKind") or "").partition("/")
+        tf = r.get("target", "").partition("_")[2]
+        return (m.group(1) == tg.split(".")[0] and norm(m.group(2)) in (norm(tk), norm(tf))
+                and norm(tid.get("from", "")) == "id")
+    return False
+
+
 def upjet_refs(v):
     """{(group, kind): [(field, target kind, how)]} from the Upjet facts:
     each reference whose target one of our kinds serves, on a field of the
@@ -248,7 +284,8 @@ def upjet_refs(v):
     The field is the one whose name is the reference's (case and
     underscores aside), a string in the kind's sample (fieldRefs fills a
     string, not a reference object or a list), taking the target's ID
-    (Upjet's default extractor). Where no field has the reference's name
+    (Upjet's default extractor, or one that gives the same: takes_id).
+    Where no field has the reference's name
     (Terraform's repository, our repo), the kind's path says it: where the
     kind's path runs through the target's item path, the field at the
     target's ID is the target's ID, and those at the target's other
@@ -277,8 +314,8 @@ def upjet_refs(v):
                         # the parents they share. The extractor doesn't
                         # matter: the path holds the ID there.
                         got = [(kf, None if tp == tid else ("same", tp)) for kf, tp in al.items()]
-                    elif r.get("extractor"):
-                        continue  # not the target's ID
+                    elif not takes_id(r, t):
+                        continue  # not the target's ID, or not known to be
                     elif f and isinstance(k["sample"][f], str):
                         # fieldRefs fills a top-level field with the
                         # target's ID: a string. A reference object

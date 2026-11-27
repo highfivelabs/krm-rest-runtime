@@ -9,7 +9,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 import examples  # noqa: E402
 
 TYPES = {"vendor": "x", "kinds": [
-    {"kind": "Team", "group": "team.x.hfl.dev", "version": "v1alpha1", "shape": "crud", "sample": {"name": "example-name"}},
+    {"kind": "Team", "group": "team.x.hfl.dev", "version": "v1alpha1", "shape": "crud", "id": {"param": "id", "from": "id"},
+     "sample": {"name": "example-name"}},
     {"kind": "Member", "group": "team.x.hfl.dev", "version": "v1alpha1", "shape": "crud",
      "sample": {"teamID": "example-teamID", "owner": {"id": "x", "type": "user_reference"}, "role": "example-role", "tags": ["a"]}},
 ]}
@@ -117,6 +118,58 @@ def write_repo(types, sl, skip=None):
 
 def generate(d):
     subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), "examples.py"), d], check=True, capture_output=True)
+
+
+class Extractors(unittest.TestCase):
+    T = {"kind": "Group", "id": {"param": "id", "from": "id"}}
+
+    def ref(self, x, **kw):
+        return {"field": "group_id", "target": "okta_group", "targetKind": "group.okta.upbound.io/Group", "extractor": x, **kw}
+
+    def test_takes_id(self):
+        yes = [None, "github.com/crossplane/upjet/v2/pkg/resource.ExtractResourceID()",
+               "github.com/healthcarecom/provider-okta/apis/group/v1alpha1.GroupID()"]
+        for x in yes:
+            self.assertTrue(examples.takes_id(self.ref(x), self.T), x)
+        # The Terraform type's words name the kind too (okta_auth_server, kind Server).
+        self.assertTrue(examples.takes_id(
+            {"target": "okta_auth_server", "targetKind": "auth.okta.upbound.io/Server",
+             "extractor": "github.com/healthcarecom/provider-okta/apis/auth/v1alpha1.AuthServerID()"}, self.T))
+        no = ["github.com/healthcarecom/provider-okta/apis/app/v1alpha1.OauthClientID()",   # a client ID, not the kind's ID
+              "github.com/healthcarecom/provider-okta/apis/user/v1alpha1.GroupID()",        # not the target's package
+              "computedFieldExtractor(\"id\")",                                             # code we can't see
+              "refs.ExtractParamPath(\"id\", true)"]                                        # not Upjet's
+        for x in no:
+            self.assertFalse(examples.takes_id(self.ref(x), self.T), x)
+        # <Kind>ID() is our ID only where ours is the API's id.
+        self.assertFalse(examples.takes_id(self.ref(yes[2]), {"id": {"param": "id", "from": "name"}}))
+        # No status.id at all: an upsert.
+        self.assertFalse(examples.takes_id(self.ref(None), {"kind": "Settings"}))
+
+    def test_param_path(self):
+        team = {"id": {"param": "id", "from": "slug"}}
+        slug = 'github.com/crossplane/upjet/v2/pkg/resource.ExtractParamPath("slug",true)'
+        self.assertTrue(examples.takes_id(self.ref(slug), team))
+        self.assertFalse(examples.takes_id(self.ref(slug.replace("slug", "name")), team))
+
+    def test_example(self):
+        types = {"vendor": "x", "kinds": [
+            {"kind": "Group", "group": "group.x.hfl.dev", "version": "v1alpha1", "shape": "crud",
+             "id": {"param": "id", "from": "id"}, "sample": {"name": "g"}},
+            {"kind": "Rule", "group": "group.x.hfl.dev", "version": "v1alpha1", "shape": "crud",
+             "id": {"param": "id", "from": "id"}, "sample": {"groupId": "x", "ownerId": "y"}},
+        ]}
+        sl = {"entries": [{"ours": {"kind": "Rule", "group": "group.x.hfl.dev"}, "facts": {"references": [
+            {"field": "group_id", "target": "x_group", "targetKind": "group.x.upbound.io/Group",
+             "extractor": "example.com/provider-x/apis/group/v1alpha1.GroupID()"},
+            {"field": "owner_id", "target": "x_group", "targetKind": "group.x.upbound.io/Group",
+             "extractor": "example.com/provider-x/apis/group/v1alpha1.OwnerID()"},
+        ]}, "targetsOurs": {"x_group": ["group.x.hfl.dev/Group"]}}]}
+        d = write_repo(types, sl)
+        generate(d)
+        _, rule = list(yaml.safe_load_all(open(os.path.join(d, "examples", "Rule", "with-Group.yaml"))))
+        self.assertEqual(rule["spec"]["fieldRefs"], {"groupId": {"kind": "Group", "name": "example-group"}})
+        self.assertEqual(rule["spec"]["ownerId"], "y")
 
 
 class ByPath(unittest.TestCase):
