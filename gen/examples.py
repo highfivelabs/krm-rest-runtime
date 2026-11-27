@@ -37,7 +37,12 @@ it is: where the kind's own path runs through the target's item path
 (/repos/{owner}/{repo}/actions/secrets/{secret_name} through Repository's
 /repos/{owner}/{id}), the field at the target's ID takes the target's ID,
 and the fields at its other parameters take the target's own values (the
-owner they share).
+owner they share). A target is made from its own Upjet references too
+(unless a live test shows it, or its own example is skipped), so that a
+parent the kind and its targets share is one object: Cloudflare's
+QueueConsumer, its Queue and both their accounts are one Account. Where
+two references would still give one field different values, there is no
+example, and the reason is printed.
 
 A target with no status.id (an upsert) is named by a spec field: the
 one its read path ends in, where the kind's path runs through it
@@ -407,18 +412,51 @@ def ref_to(v, t, tname, field_path=None):
     return ref
 
 
-def upjet_objects(v, k, refs):
-    """k after the targets of its Upjet references, each from its own spec,
-    or None where two references give a field different values."""
+class Upjet:
+    """What the examples from Upjet references are built from: every
+    kind's references (upjet_refs), the kinds whose examples are skipped,
+    and the kinds a live-test example already shows."""
+    def __init__(self, v, refs=None, skip=(), shown=()):
+        self.v, self.refs, self.skip, self.shown = v, refs if refs is not None else upjet_refs(v), skip, shown
+        self.made, self.making = {}, set()
+
+    def target(self, t):
+        """t as objects, after those it needs: from its own Upjet
+        references too, so that a parent the kind shares with it is the
+        same object (Cloudflare's QueueConsumer and its Queue name the same
+        Account), unless a live test shows t, or t's own example is
+        skipped. The same objects each time it is asked."""
+        key = (t["group"], t["kind"])
+        if key not in self.made:
+            objs = None
+            if key in self.refs and key not in self.shown and t["kind"] not in self.skip and key not in self.making:
+                self.making.add(key)
+                objs = upjet_objects(self, t, self.refs[key], quiet=True)
+                self.making.discard(key)
+            self.made[key] = objs or self.v.objects(t, "example-" + t["kind"].lower())
+        return self.made[key]
+
+
+def upjet_objects(u, k, refs, quiet=False):
+    """k after the targets of its Upjet references, each from its own spec
+    (Upjet.target), or None where two references give a field different
+    values, or two targets need different objects of one name."""
+    v = u.v if isinstance(u, Upjet) else u
+    u = u if isinstance(u, Upjet) else Upjet(v, refs={})
     name = "example-" + k["kind"].lower()
     out, values = [], {}
     spec, _, _ = v.spec_of(k, name, [])
     for f, t, how in refs:
         tname = "example-" + t["kind"].lower()
-        tobjs = v.objects(t, tname)
+        tobjs = u.target(t)
         for o in tobjs:
-            if o not in out:
+            same = next((x for x in out if (x["kind"], x["metadata"]["name"]) == (o["kind"], o["metadata"]["name"])), None)
+            if same is None:
                 out.append(o)
+            elif same != o:
+                if not quiet:
+                    print(f"{k['kind']}: no example from Upjet references (two different {o['kind']} {o['metadata']['name']})", file=sys.stderr)
+                return None
         if how is None:
             val = ("ref", ref_to(v, t, tname))
         elif how[0] == "path":
@@ -441,7 +479,8 @@ def upjet_objects(v, k, refs):
             else:
                 continue
         if values.setdefault(f, val) != val:
-            print(f"{k['kind']}: no example from Upjet references ({f} would be both {values[f][1]} and {val[1]})", file=sys.stderr)
+            if not quiet:
+                print(f"{k['kind']}: no example from Upjet references ({f} would be both {values[f][1]} and {val[1]})", file=sys.stderr)
             return None
     for f in values:
         spec.pop(f, None)
@@ -490,14 +529,15 @@ def main():
     sp = os.path.join(repo, "hack", "gen", "examples-skip.yaml")
     skip = ((yaml.safe_load(open(sp)) or {}).get("upjet") or {}) if os.path.exists(sp) else {}
     used = set()
-    for (g, kn), refs in sorted(upjet_refs(v).items()):
+    u = Upjet(v, skip=skip, shown=shown)
+    for (g, kn), refs in sorted(u.refs.items()):
         if (g, kn) in shown:
             continue
         if kn in skip:
             used.add(kn)
             print(f"{kn}: no example from Upjet references ({skip[kn]})", file=sys.stderr)
             continue
-        objs = upjet_objects(v, v.kind(kn, g), refs)
+        objs = upjet_objects(u, v.kind(kn, g), refs)
         if objs and len(objs) > 1:
             write(out_dir, v.kind(kn, g), objs, UPJET_HEAD)
             nu += 1

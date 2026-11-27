@@ -256,6 +256,52 @@ class Values(unittest.TestCase):
         self.assertEqual(self.refs(self.repo(live=False), "Protection"), [("repositoryId", "Repository", None)])
 
 
+# Cloudflare's shape: a consumer of a queue, both in one account.
+def acct_kind(kind, path, params, sample, idp):
+    return {"kind": kind, "group": "q.x.hfl.dev", "version": "v1alpha1", "shape": "crud",
+            "create": {"method": "POST", "path": path.rsplit("/", 1)[0]}, "read": {"method": "GET", "path": path},
+            "params": [{"name": n, "field": f} for n, f in params], "id": {"param": idp, "from": "id"}, "sample": sample}
+
+
+SHARED_TYPES = {"vendor": "x", "kinds": [
+    acct_kind("Account", "/accounts/{account_id}", [], {"name": "a"}, "account_id"),
+    acct_kind("Queue", "/accounts/{account_id}/queues/{queue_id}", [("account_id", "accountID")],
+              {"accountID": "example-account-id", "queue_name": "q"}, "queue_id"),
+    acct_kind("Consumer", "/accounts/{account_id}/queues/{queue_id}/consumers/{consumer_id}",
+              [("account_id", "accountID"), ("queue_id", "queueID")], {"accountID": "example-account-id", "queueID": "x", "type": "worker"}, "consumer_id"),
+]}
+
+
+def shared_slice(queue_refs=True):
+    acct = {"x_account": ["q.x.hfl.dev/Account"]}
+    entries = [{"ours": {"kind": "Consumer", "group": "q.x.hfl.dev"},
+                "facts": {"references": [{"field": "account_id", "target": "x_account"}, {"field": "queue_id", "target": "x_queue"}]},
+                "targetsOurs": {**acct, "x_queue": ["q.x.hfl.dev/Queue"]}}]
+    if queue_refs:
+        entries.append({"ours": {"kind": "Queue", "group": "q.x.hfl.dev"},
+                        "facts": {"references": [{"field": "account_id", "target": "x_account"}]}, "targetsOurs": acct})
+    return {"entries": entries}
+
+
+class SharedParents(unittest.TestCase):
+    def test_one_account(self):
+        d = write_repo(SHARED_TYPES, shared_slice())
+        generate(d)
+        acct, queue, consumer = list(yaml.safe_load_all(open(os.path.join(d, "examples", "Consumer", "with-Account-and-Queue.yaml"))))
+        a = {"kind": "Account", "name": "example-account"}
+        self.assertEqual(queue["spec"]["fieldRefs"], {"accountID": a})
+        self.assertEqual(consumer["spec"]["fieldRefs"], {"accountID": a, "queueID": {"kind": "Queue", "name": "example-queue"}})
+
+    def test_parents_that_dont_meet(self):
+        # The queue is in its sample's account, the consumer in the new
+        # Account: Cloudflare would find no such queue. No example.
+        d = write_repo(SHARED_TYPES, shared_slice(queue_refs=False))
+        p = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), "examples.py"), d], capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("Consumer: no example from Upjet references (accountID would be both", p.stderr)
+        self.assertFalse(os.path.exists(os.path.join(d, "examples", "Consumer")))
+
+
 class ByPath(unittest.TestCase):
     def test_refs(self):
         refs = examples.upjet_refs(examples.Vendor(write_repo(PATH_TYPES, PATH_SLICE)))
