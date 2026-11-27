@@ -317,6 +317,7 @@ class ByPath(unittest.TestCase):
         # The secret's repo is the repository's ID, and its owner the
         # repository's own (not its sample's example-owner).
         self.assertEqual(secret["spec"]["owner"], "the-org")
+        self.assertEqual(list(secret["spec"]), ["owner", "secretName", "fieldRefs"])  # in its place
         self.assertNotIn("repo", secret["spec"])
         self.assertEqual(secret["spec"]["fieldRefs"], {"repo": {"kind": "Repository", "name": "example-repository"}})
         self.assertFalse(os.path.exists(os.path.join(d, "examples", "Fork")))

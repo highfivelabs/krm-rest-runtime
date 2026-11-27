@@ -482,9 +482,10 @@ def upjet_objects(u, k, refs, quiet=False):
             if not quiet:
                 print(f"{k['kind']}: no example from Upjet references ({f} would be both {values[f][1]} and {val[1]})", file=sys.stderr)
             return None
-    for f in values:
-        spec.pop(f, None)
-    spec = fill(spec, name)
+    for f, (what, _) in values.items():
+        if what == "ref":
+            spec.pop(f, None)
+    spec = fill(spec, name)  # a value taken from a target keeps its place
     field_refs = {}
     for f, (what, val) in values.items():
         if what == "ref":
