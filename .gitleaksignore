@@ -1,0 +1,17 @@
+# gitleaks false positives, by fingerprint (commit:file:rule:line); krm-ci's
+# gitleaks.toml asks for them here rather than a disabled rule. Each one was
+# read and is not a credential: example values from the vendor's API spec,
+# made-up test inputs, or generated IDs (HFL-815).
+a237bac5692cfe0f69549d7540eb620f0d7ab805:cassette/cassette_test.go:generic-api-key:164
+a237bac5692cfe0f69549d7540eb620f0d7ab805:cassette/cassette_test.go:generic-api-key:180
+a237bac5692cfe0f69549d7540eb620f0d7ab805:cassette/cassette_test.go:generic-api-key:226
+a237bac5692cfe0f69549d7540eb620f0d7ab805:cassette/cassette_test.go:generic-api-key:227
+a237bac5692cfe0f69549d7540eb620f0d7ab805:cassette/cassette_test.go:generic-api-key:443
+a237bac5692cfe0f69549d7540eb620f0d7ab805:cassette/cassette_test.go:generic-api-key:527
+a237bac5692cfe0f69549d7540eb620f0d7ab805:cassette/cassette_test.go:private-key:164
+a237bac5692cfe0f69549d7540eb620f0d7ab805:cassette/known_test.go:generic-api-key:192
+a237bac5692cfe0f69549d7540eb620f0d7ab805:cassette/known_test.go:generic-api-key:205
+a237bac5692cfe0f69549d7540eb620f0d7ab805:cassette/known_test.go:generic-api-key:217
+a237bac5692cfe0f69549d7540eb620f0d7ab805:cassette/known_test.go:generic-api-key:32
+a237bac5692cfe0f69549d7540eb620f0d7ab805:cassette/known_test.go:generic-api-key:96
+a237bac5692cfe0f69549d7540eb620f0d7ab805:kindtest/live_redact_test.go:generic-api-key:70
