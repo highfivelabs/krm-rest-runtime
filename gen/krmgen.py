@@ -1996,12 +1996,12 @@ def build(cfg, base):
             # A path parameter whose value keeps its slashes ({+path}: a
             # GitHub file in a directory, .../contents/docs/README.md, as
             # go-github sends it): overrides.keepSlashes.
-            found = False
+            slashed = False
             for op in [desc.get(n) for n in ("create", "read", "update", "delete")] + list(desc.get("beforeDelete") or ()):
                 if op and "{" + name + "}" in (op.get("path") or ""):
                     op["path"] = op["path"].replace("{" + name + "}", "{+" + name + "}")
-                    found = True
-            if not found:
+                    slashed = True
+            if not slashed:
                 sys.exit(f"overrides.keepSlashes: {item} has no {{{name}}}")
             keep_slashes_used.add(item)
         # "live" once the kind passed create, update, drift and delete against
